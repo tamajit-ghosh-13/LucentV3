@@ -1,0 +1,6 @@
+{
+  "name": "Lucent - User-Centric Web Accessibility",
+  "description": "An AI-assisted Chrome Extension prototype that dynamically adapts any third-party webpage DOM in real-time according to user accessibility profiles (Visual, Cognitive, Motor).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
