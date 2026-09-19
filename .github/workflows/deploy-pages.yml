@@ -28,7 +28,7 @@ jobs:
         run: |
           mkdir _site
           # Copy standalone.html from the public folder and rename it to index.html
-          cp public/standalone.html _site/index.html
+          cp public/index.html _site/index.html
           
       - name: Setup Pages
         uses: actions/configure-pages@v4
