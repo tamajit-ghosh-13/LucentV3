@@ -47,7 +47,8 @@
 - [Strategic Differentiation](#-strategic-differentiation)
 - [AI & Intelligence Layer](#-ai--intelligence-layer)
 - [The Online RL Feedback Loop](#-the-online-rl-feedback-loop)
-- [Tech Stack](#-tech-stack)
+- [Database Layer — The Memory of the RL Agent](#️-database-layer--the-memory-of-the-rl-agent)
+- [Tech Stack](#️-tech-stack)
 - [Repository Structure](#-repository-structure)
 - [Go-To-Market](#-go-to-market)
 - [Roadmap](#-roadmap)
@@ -528,6 +529,137 @@ flowchart TD
 
 ---
 
+## 🗄️ Database Layer — The Memory of the RL Agent
+
+> **Without a persistent database, every session starts cold.** IndexedDB alone is local and ephemeral — cleared when the user wipes browser data or switches devices. Without a durable store, the RL engine can never build the *growing, unique, cross-session personalized recommendations* that make Lucent genuinely intelligent.
+
+### Why Two Storage Tiers?
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                      TWO-TIER RL STORAGE STRATEGY                          │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│   TIER 1 — IN-BROWSER (IndexedDB)          TIER 2 — BACKEND (PostgreSQL)  │
+│   ─────────────────────────────────        ──────────────────────────────  │
+│   Purpose: Hot reads during a session      Purpose: Durable source of truth│
+│   Latency: < 1ms (no network)              Latency: < 5ms (Redis cache)    │
+│   Persistence: Until browser data clears   Persistence: Forever            │
+│   Cross-device: ❌ No                      Cross-device: ✅ Yes            │
+│   Scope: Active tab session only           Scope: All sessions, all devices│
+│                                                                            │
+│   FLOW:                                                                    │
+│   Page loads → fetch Q-table from PostgreSQL (via Redis cache)             │
+│             → seed IndexedDB for in-session hot reads                      │
+│   Interaction → Q-update in IndexedDB (< 1ms, no network hit)             │
+│             → DOM adapted immediately                                      │
+│   Every 30s / tab close → sync IndexedDB → PostgreSQL                     │
+│   Next session on ANY device → load fresh personalized policy              │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### PostgreSQL Data Model
+
+```mermaid
+erDiagram
+    users {
+        uuid id PK
+        text device_id
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    user_profiles {
+        uuid id PK
+        uuid user_id FK
+        text profile_name
+        jsonb settings
+        boolean is_active
+        timestamp updated_at
+    }
+
+    domain_overrides {
+        uuid id PK
+        uuid user_id FK
+        text domain
+        jsonb settings
+        timestamp created_at
+    }
+
+    rl_qtables {
+        uuid id PK
+        uuid user_id FK
+        text domain
+        text profile_type
+        jsonb q_table
+        int episode_count
+        timestamp last_updated
+    }
+
+    rl_episodes {
+        uuid id PK
+        uuid user_id FK
+        text domain
+        jsonb state
+        text action
+        float reward
+        jsonb next_state
+        timestamp ts
+    }
+
+    interaction_events {
+        uuid id PK
+        uuid user_id FK
+        text domain
+        text event_type
+        text element_selector
+        jsonb metadata
+        timestamp ts
+    }
+
+    users ||--o{ user_profiles : "has"
+    users ||--o{ domain_overrides : "has"
+    users ||--o{ rl_qtables : "owns"
+    users ||--o{ rl_episodes : "generates"
+    users ||--o{ interaction_events : "logs"
+```
+
+### What Each Table Does for RL Personalization
+
+| Table | RL Role | Key Fields |
+|:---|:---|:---|
+| `users` | Identity anchor — links all RL data to one person | `device_id` — anonymous, no auth required for free tier |
+| `user_profiles` | Stores the *learned preference profile* per mode | `settings` JSONB grows as RL updates thresholds |
+| `domain_overrides` | Per-site profile customisation | User can have different settings for Twitter vs gov portals |
+| `rl_qtables` | **The learned policy** — Q-values per `(user × domain × profile)` | `q_table` JSONB: `{ stateHash → { action → qValue } }` |
+| `rl_episodes` | **The replay buffer** — full history of `(state, action, reward, next_state)` | Used for offline re-training and policy improvement |
+| `interaction_events` | Raw frustration telemetry | `event_type`: `rage_click / missed_target / dwell_spike / success_click` |
+
+### Redis Caching Strategy
+
+```
+GET /api/rl/policy?userId=X&domain=Y&profile=visual
+      │
+      ▼
+Redis key: "qtable:{userId}:{domain}:{profile}"
+      │
+      ├── HIT  → Return Q-table JSON (< 1ms)
+      │
+      └── MISS → Query PostgreSQL rl_qtables
+                 → Cache result in Redis (TTL: 1 hour)
+                 → Return Q-table JSON (< 5ms)
+
+POST /api/rl/sync (session end)
+      │
+      ├── Upsert rl_qtables (updated Q-values)
+      ├── Bulk insert rl_episodes
+      ├── Bulk insert interaction_events
+      └── Invalidate Redis key → next fetch gets fresh policy
+```
+
+---
+
 ## 🛠️ Tech Stack
 
 <div align="center">
@@ -552,7 +684,13 @@ flowchart TD
 │                         │  @google/genai SDK · Structured Output    │
 ├─────────────────────────┼───────────────────────────────────────────┤
 │  Online RL Engine       │  Custom TypeScript Q-Agent (zero deps)    │
-│                         │  IndexedDB via idb-keyval · ε-greedy      │
+│                         │  IndexedDB via idb-keyval (hot cache)     │
+│                         │  ε-greedy · α=0.1 · γ=0.9               │
+├─────────────────────────┼───────────────────────────────────────────┤
+│  Database               │  PostgreSQL (durable Q-table + profiles)  │
+│  (RL Memory)            │  Prisma ORM (type-safe, auto-migrations)  │
+│                         │  Redis + ioredis (server-side hot cache)  │
+│                         │  IndexedDB (in-browser session cache)     │
 ├─────────────────────────┼───────────────────────────────────────────┤
 │  WCAG Audit Engine      │  axe-core (WCAG 2.2 AA/AAA)              │
 │                         │  Custom WCAG luminance calculator         │
