@@ -9,7 +9,9 @@ import {
   Layers, 
   Download, 
   ExternalLink,
-  Code
+  Code,
+  UserCheck,
+  LogOut
 } from 'lucide-react';
 
 interface BrowserBarProps {
@@ -20,7 +22,12 @@ interface BrowserBarProps {
   onOpenArtifactModal: () => void;
   onResetPortal: () => void;
   extensionActive: boolean;
+  userEmail?: string;
+  activeProfileLabel?: string;
+  onSwitchProfileOrAuth?: () => void;
+  onSignOut?: () => void;
 }
+
 
 export const BrowserBar: React.FC<BrowserBarProps> = ({
   url,
@@ -29,7 +36,11 @@ export const BrowserBar: React.FC<BrowserBarProps> = ({
   onToggleViewMode,
   onOpenArtifactModal,
   onResetPortal,
-  extensionActive
+  extensionActive,
+  userEmail,
+  activeProfileLabel,
+  onSwitchProfileOrAuth,
+  onSignOut
 }) => {
   return (
     <header className="bg-slate-900 border-b border-slate-800 px-4 py-2.5 flex items-center justify-between gap-3 select-none sticky top-0 z-40 shadow-md">
@@ -125,6 +136,31 @@ export const BrowserBar: React.FC<BrowserBarProps> = ({
               </span>
             )}
           </div>
+        </div>
+
+        {/* Active Disability Profile Indicator & Log Out Button */}
+        <div className="flex items-center gap-1.5">
+          <div
+            className="flex items-center gap-1.5 bg-slate-800/90 border border-cyan-500/40 text-cyan-300 px-2.5 py-1.5 rounded-lg text-xs font-bold shadow-sm"
+            title={userEmail ? `Signed in as ${userEmail}. Active profile: ${activeProfileLabel}` : `Active profile: ${activeProfileLabel}`}
+          >
+            <UserCheck size={14} className="text-cyan-400" />
+            <span className="hidden sm:inline max-w-[120px] truncate">
+              {activeProfileLabel ? activeProfileLabel : 'RAW'}
+            </span>
+          </div>
+
+          {onSignOut && (
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="flex items-center gap-1 px-2 py-1.5 bg-slate-800 hover:bg-rose-950/60 hover:border-rose-500/50 border border-slate-700 text-slate-300 hover:text-rose-200 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-sm"
+              title="Sign Out of Lucent Account"
+            >
+              <LogOut size={13} className="text-rose-400" />
+              <span className="hidden md:inline">Log Out</span>
+            </button>
+          )}
         </div>
 
         {/* Single-File HTML Artifact Download / View Modal */}
