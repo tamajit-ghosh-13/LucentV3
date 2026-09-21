@@ -8,7 +8,8 @@ import {
   BarChart3,
 } from "lucide-react";
 
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
+import { useLucent } from '../../lib/lucent-state';
 
 const navigation = [
   {
@@ -34,6 +35,7 @@ const navigation = [
 ];
 
 export default function Sidebar() {
+  const { signOut } = useLucent(); const navigate = useNavigate();
   return (
     <aside className="dashboard-sidebar">
 
@@ -101,7 +103,7 @@ export default function Sidebar() {
         </NavLink>
 
 
-        <button className="dashboard-nav-item dashboard-logout">
+        <button className="dashboard-nav-item dashboard-logout" onClick={() => { signOut(); navigate('/'); }}>
           <LogOut size={18} />
           <span>Logout</span>
         </button>

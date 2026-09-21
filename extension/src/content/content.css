@@ -1,61 +1,18 @@
-/* Accessibility reinforcement styles applied when the extension fixes issues */
+/* Lucent cognitive + motor overlays: all selectors require a user-enabled class. */
+html.lucent-declutter aside, html.lucent-declutter [role="banner"], html.lucent-declutter [role="complementary"], html.lucent-declutter [aria-label*="advert" i], html.lucent-declutter [class*="advert" i], html.lucent-declutter [class*="popup" i] { display: none !important; }
+html.lucent-dyslexia body { font-family: OpenDyslexic, "Comic Sans MS", Arial, sans-serif !important; letter-spacing: .045em !important; line-height: 1.75 !important; word-spacing: .12em !important; }
+html.lucent-calm *, html.lucent-calm *::before, html.lucent-calm *::after { animation-duration: .01ms !important; animation-delay:0ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; transition-delay:0ms !important; caret-color:auto !important; }
+html.lucent-calm video[autoplay], html.lucent-calm [class*="carousel" i], html.lucent-calm [class*="ticker" i] { animation-play-state:paused !important; }
+html.lucent-reading-width p, html.lucent-reading-width li, html.lucent-reading-width article { max-width: 72ch !important; }
+html.lucent-motor-targets button, html.lucent-motor-targets a, html.lucent-motor-targets input, html.lucent-motor-targets select, html.lucent-motor-targets [role="button"] { min-width: 48px !important; min-height: 48px !important; }
+html.lucent-focus *:focus-visible { outline: 4px solid #22c55e !important; outline-offset: 4px !important; box-shadow: 0 0 0 7px rgba(34,197,94,.28) !important; }
+html.lucent-large-cursor, html.lucent-large-cursor * { cursor: none !important; }
+.lucent-large-cursor-dot { position:fixed; z-index:2147483646; width:28px; height:28px; border:3px solid #22c55e; border-radius:50%; background:rgba(255,255,255,.18); box-shadow:0 0 0 3px rgba(0,0,0,.55); pointer-events:none; left:0; top:0; }
+[data-lucent-shortcut] { position: relative !important; }
+[data-lucent-shortcut]::after { content: attr(data-lucent-shortcut); position: absolute; z-index: 2147483647; top: -9px; left: -9px; width: 20px; height: 20px; display:grid; place-items:center; border-radius:999px; background:#111827; color:#fff; border:2px solid #86efac; font:700 12px/1 system-ui; pointer-events:none; }
+.lucent-reading-guide { position:fixed; inset:0; z-index:2147483646; height:68px; background:rgba(251,191,36,.12); border-top:2px solid rgba(251,191,36,.7); border-bottom:2px solid rgba(251,191,36,.7); pointer-events:none; transition:transform .06s ease-out; }
+[data-accessibility-issue] { position:relative; }
+[data-accessibility-issue]::after { content:'⚠️'; position:absolute; top:-12px; right:-12px; z-index:2147483647; pointer-events:none; }
 
-/* 1. Enhanced Focus Indicators (Cognitive/Visual Impairment) */
-html[data-accessibility-enabled="true"] *:focus {
-    outline: 3px solid #10b981 !important;
-    outline-offset: 2px !important;
-    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.4) !important;
-}
-
-/* 2. Expanded Hitboxes for Motor Impairment (Reduces precision requirement) */
-html[data-accessibility-enabled="true"] button,
-html[data-accessibility-enabled="true"] a,
-html[data-accessibility-enabled="true"] select,
-html[data-accessibility-enabled="true"] input[type="checkbox"],
-html[data-accessibility-enabled="true"] input[type="radio"],
-html[data-accessibility-enabled="true"] [role="button"],
-html[data-accessibility-enabled="true"] [role="link"] {
-    min-width: 44px !important;
-    min-height: 44px !important;
-    display: inline-block !important;
-    cursor: pointer !important;
-}
-
-/* 3. Improved contrast for common text elements */
-html[data-accessibility-enabled="true"] p,
-html[data-accessibility-enabled="true"] span,
-html[data-accessibility-enabled="true"] div,
-html[data-accessibility-enabled="true"] h1,
-html[data-accessibility-enabled="true"] h2,
-html[data-accessibility-enabled="true"] h3,
-html[data-accessibility-enabled="true"] h4,
-html[data-accessibility-enabled="true"] h5,
-html[data-accessibility-enabled="true"] h6 {
-    text-shadow: 0px 0px 1px rgba(0,0,0,0.1) !important;
-}
-
-/* 4. Magnifying images on hover for Cognitive/Visual impairments */
-html[data-accessibility-enabled="true"] img:hover,
-html[data-accessibility-enabled="true"] svg:hover {
-    transform: scale(1.05);
-    transition: transform 0.2s ease-in-out;
-    z-index: 9999;
-    position: relative;
-}
-
-/* 5. Scanner Highlights */
-[data-accessibility-issue] {
-    position: relative;
-}
-[data-accessibility-issue]::after {
-    content: "⚠️";
-    position: absolute;
-    top: -12px;
-    right: -12px;
-    font-size: 14px;
-    background: white;
-    border-radius: 50%;
-    z-index: 10000;
-    pointer-events: none;
-    box-shadow: 0px 2px 4px rgba(0,0,0,0.2);
-}
+/* Persistent bottom-right control: isolated class names avoid host-site collisions. */
+#lucent-widget{position:fixed;right:20px;bottom:20px;z-index:2147483647;font-family:system-ui,-apple-system,sans-serif;color:#ecfff3;line-height:1.25;text-align:left}#lucent-widget *{box-sizing:border-box}#lucent-widget .lucent-fab{border:1px solid #5b6b62;background:#38463d;color:#f1fff5;border-radius:999px;padding:11px 15px;display:flex;align-items:center;gap:8px;font:700 14px system-ui;box-shadow:0 12px 30px rgba(0,0,0,.3);cursor:pointer}#lucent-widget.is-on .lucent-fab{background:#22c55e;border-color:#86efac;color:#073618;box-shadow:0 0 0 4px rgba(34,197,94,.22),0 12px 30px rgba(0,0,0,.3)}#lucent-widget .lucent-menu{position:absolute;right:0;bottom:55px;width:270px;padding:14px;background:#0c1b12;border:1px solid #42664e;border-radius:15px;box-shadow:0 18px 45px rgba(0,0,0,.45)}#lucent-widget .lucent-menu[hidden]{display:none}#lucent-widget .lucent-menu-header{display:flex;align-items:center;justify-content:space-between;font-size:14px}#lucent-widget .lucent-hint{color:#accab6;font-size:12px;margin:6px 0 10px}#lucent-widget .lucent-master{border:0;border-radius:999px;background:#46554c;color:#fff;padding:6px 10px;font-weight:800;cursor:pointer}#lucent-widget .lucent-master.is-on{background:#22c55e;color:#073618}#lucent-widget .lucent-options{border-top:1px solid #294334;padding-top:5px}#lucent-widget .lucent-options label{display:flex;justify-content:space-between;align-items:center;padding:8px 1px;color:#e5f5e9;font-size:13px;cursor:pointer}#lucent-widget input{accent-color:#22c55e;width:16px;height:16px}
