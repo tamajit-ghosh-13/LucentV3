@@ -2,18 +2,85 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>AccessLayer</title>
+    <title>AccessLayer Scanner</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            width: 320px;
+            padding: 16px;
+            margin: 0;
+            background-color: #1e1e1e;
+            color: #ffffff;
+        }
+        h2 { 
+            margin-top: 0; 
+            font-size: 1.2rem; 
+            display: flex; 
+            align-items: center; 
+            gap: 8px;
+        }
+        .container { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 12px; 
+        }
+        
+        button {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            width: 100%;
+        }
+        button:hover { background-color: #2563eb; }
+        button:disabled { background-color: #475569; cursor: not-allowed; }
+        
+        #btn-reinforce { background-color: #10b981; display: none; }
+        #btn-reinforce:hover { background-color: #059669; }
+
+        #results {
+            background-color: #2d2d2d;
+            border-radius: 8px;
+            padding: 16px;
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+            font-family: monospace;
+            font-size: 13px;
+            border: 1px solid #404040;
+        }
+
+        .result-item { display: flex; align-items: center; gap: 8px; }
+        .result-total { font-weight: bold; font-size: 15px; margin-bottom: 8px; color: #f87171; }
+        
+        .result-count { color: #f87171; font-weight: bold; min-width: 16px;}
+        .result-label { color: #d1d5db; }
+        
+        .icon { font-size: 16px; }
+    </style>
 </head>
-
 <body>
-    <h2>AccessLayer</h2>
+    <div class="container">
+        <h2><span class="icon">👁️</span> AccessLayer</h2>
+        <p style="font-size: 13px; color: #9ca3af; margin: 0 0 8px 0;">Scan the current page for accessibility issues.</p>
+        
+        <button id="btn-scan">Scan Page</button>
+        
+        <div id="results">
+            <div class="result-total" id="total-issues">0 issues found</div>
+            <div class="result-item"><span class="result-count" id="count-targets">0</span> <span class="result-label">small targets</span></div>
+            <div class="result-item"><span class="result-count" id="count-unlabeled">0</span> <span class="result-label">unlabeled buttons</span></div>
+            <div class="result-item"><span class="result-count" id="count-contrast">0</span> <span class="result-label">low contrast elements</span></div>
+            <div class="result-item"><span class="result-count" id="count-images">0</span> <span class="result-label">missing image description</span></div>
+        </div>
 
-    <p>Accessibility Extension</p>
-
-    <button id="toggle">
-        Activate
-    </button>
-
+        <button id="btn-reinforce">✨ Fix Issues Automatically</button>
+    </div>
     <script src="popup.js"></script>
 </body>
 </html>
