@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "AccessLayer",
+  "version": "1.0.0",
+  "description": "An adaptive accessibility layer for the web.",
+
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "AccessLayer",
+    "default_icon": "icons/grey.png"
+  },
+
+  "background": {
+    "service_worker": "src/background/serviceWorker.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/content.js"],
+      "css": ["src/content/content.css"]
+    }
+  ]
+}
