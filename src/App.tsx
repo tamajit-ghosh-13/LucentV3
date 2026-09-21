@@ -18,10 +18,18 @@ import { TargetPortal } from './components/TargetPortal';
 import { ExtensionHud } from './components/ExtensionHud';
 import { ArtifactModal } from './components/ArtifactModal';
 import { HackathonBanner } from './components/HackathonBanner';
+import { AuthPage } from './signuppage/AuthPage';
+import { signOutUser } from './lib/supabase';
 
 export default function App() {
+  // Check persisted session on startup
+  const savedSessionStr = typeof window !== 'undefined' ? localStorage.getItem('lucent_user_session') : null;
+  const initialSession = savedSessionStr ? JSON.parse(savedSessionStr) : null;
+
+  const [showAuthPage, setShowAuthPage] = useState<boolean>(!initialSession);
+  const [userEmail, setUserEmail] = useState<string | undefined>(initialSession?.email);
   const [viewMode, setViewMode] = useState<'overlay' | 'split'>('overlay');
-  const [currentProfile, setCurrentProfile] = useState<AccessibilityProfile>('raw');
+  const [currentProfile, setCurrentProfile] = useState<AccessibilityProfile>(initialSession?.profile || 'raw');
   const [isArtifactModalOpen, setIsArtifactModalOpen] = useState(false);
   const [isScanningAi, setIsScanningAi] = useState(false);
   const [rageCount, setRageCount] = useState(0);
@@ -233,6 +241,47 @@ export default function App() {
     addTelemetryLog('DOM_PATCH', 'Target portal reset to initial raw state.', 'blue');
   };
 
+  const handleAuthComplete = (selectedProfile: AccessibilityProfile, email?: string) => {
+    const activeEmail = email || 'Guest Demo';
+    setUserEmail(activeEmail);
+    handleSelectProfile(selectedProfile);
+    setShowAuthPage(false);
+
+    // Save session permanently until explicit log out
+    localStorage.setItem(
+      'lucent_user_session', 
+      JSON.stringify({ email: activeEmail, profile: selectedProfile })
+    );
+
+    addTelemetryLog(
+      'USER_TELEMETRY', 
+      `User logged in (${activeEmail}). Session saved permanently. Activated profile: [${selectedProfile.toUpperCase()}]`, 
+      'emerald'
+    );
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOutUser();
+    } catch (e) {
+      console.warn('Sign out error:', e);
+    }
+    localStorage.removeItem('lucent_user_session');
+    setUserEmail(undefined);
+    setShowAuthPage(true);
+    handleSelectProfile('raw');
+    addTelemetryLog('USER_TELEMETRY', 'User explicitly signed out. Returned to login page.', 'rose');
+  };
+
+  if (showAuthPage) {
+    return (
+      <AuthPage
+        onAuthSuccess={handleAuthComplete}
+        onContinueAsGuest={(prof) => handleAuthComplete(prof, 'Guest Demo')}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 font-sans text-slate-100">
       {/* Hackathon Context Header */}
@@ -247,6 +296,10 @@ export default function App() {
         onOpenArtifactModal={() => setIsArtifactModalOpen(true)}
         onResetPortal={handlePortalReset}
         extensionActive={totalActiveMutations > 0}
+        userEmail={userEmail}
+        activeProfileLabel={currentProfile.toUpperCase()}
+        onSwitchProfileOrAuth={() => setShowAuthPage(true)}
+        onSignOut={handleSignOut}
       />
 
       {/* Main View Area */}
