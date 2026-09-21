@@ -58,8 +58,14 @@ export default function App() {
     stickyTargets: false,
     rageClickAdaptation: true,
     doubleClickDebounce: true,
-    steadyClick: true
+    steadyClick: true,
+    dwellClick: false,
+    dwellDelay: 750,
+    magneticGravity: false,
+    holdToConfirm: false,
+    motorAutopilotActive: false
   });
+  const [isAutopilotRunning, setIsAutopilotRunning] = useState(false);
 
   // Telemetry stream
   const [telemetryLogs, setTelemetryLogs] = useState<TelemetryLog[]>([
@@ -101,7 +107,9 @@ export default function App() {
     textBlocksSimplified: cognitive.simplifyText ? 1 : 0,
     contrastPatchesApplied: visual.highContrast ? 14 : 0,
     distractionsSuppressed: cognitive.declutter ? 1 : 0,
-    shortcutsAssigned: motor.focusNavigation ? 9 : 0
+    shortcutsAssigned: motor.focusNavigation ? 9 : 0,
+    dwellClicksTriggered: motor.dwellClick ? 3 : 0,
+    gravitySnapsApplied: motor.magneticGravity ? 6 : 0
   };
 
   const totalActiveMutations = 
@@ -137,7 +145,12 @@ export default function App() {
         stickyTargets: false,
         rageClickAdaptation: true,
         doubleClickDebounce: true,
-        steadyClick: true
+        steadyClick: true,
+        dwellClick: false,
+        dwellDelay: 750,
+        magneticGravity: false,
+        holdToConfirm: false,
+        motorAutopilotActive: false
       });
       addTelemetryLog('DOM_PATCH', 'Reverted all dynamic DOM patches. Unprotected baseline exposed.', 'rose');
     } else if (profile === 'visual') {
@@ -170,11 +183,16 @@ export default function App() {
         stickyTargets: true,
         rageClickAdaptation: true,
         doubleClickDebounce: true,
-        steadyClick: true
+        steadyClick: true,
+        dwellClick: true,
+        dwellDelay: 750,
+        magneticGravity: true,
+        holdToConfirm: true,
+        motorAutopilotActive: false
       });
       setVisual(prev => ({ ...prev, highContrast: false }));
       setCognitive(prev => ({ ...prev, declutter: false, simplifyText: false }));
-      addTelemetryLog('RL_AGENT', 'Activated Motor Impairment Suite: Targets enlarged to >=48px + [1-9] keyboard shortcuts + tremor filter', 'amber');
+      addTelemetryLog('RL_AGENT', 'Activated Motor Impairment Suite: Targets >=48px + Dwell-Click + Target Gravity + Spasm Guard + Shortcuts [1-9]', 'amber');
     }
   };
 
@@ -234,6 +252,18 @@ export default function App() {
       setIsScanningAi(false);
       addTelemetryLog('AI_GEMINI', 'Gemini Vision parsed 4 unlabelled icons: injected descriptive aria-label & tooltips (98.4% mean confidence)', 'emerald');
     }, 900);
+  };
+
+  // Simulated Gemini Motor Autopilot (1-Click Form Synthesis for Motor Accessibility)
+  const handleTriggerMotorAutopilotSim = () => {
+    setIsAutopilotRunning(true);
+    addTelemetryLog('AI_GEMINI', 'Gemini 2.0 Flash analyzing DOM form topology & input constraints...', 'purple');
+
+    setTimeout(() => {
+      setMotor(prev => ({ ...prev, motorAutopilotActive: true }));
+      setIsAutopilotRunning(false);
+      addTelemetryLog('AI_GEMINI', 'Gemini Motor Autopilot: Synthesized verified resident declaration & auto-filled 4 inputs (15 fine-motor actions reduced to 1)', 'emerald');
+    }, 1000);
   };
 
   const handlePortalReset = () => {
@@ -358,6 +388,8 @@ export default function App() {
                   onTriggerRageClickSim={handleTriggerRageClickSim}
                   onTriggerGeminiScanSim={handleTriggerGeminiScanSim}
                   isScanningAi={isScanningAi}
+                  onTriggerMotorAutopilot={handleTriggerMotorAutopilotSim}
+                  isAutopilotRunning={isAutopilotRunning}
                 />
               </div>
             </motion.div>
@@ -395,6 +427,8 @@ export default function App() {
                   onTriggerRageClickSim={handleTriggerRageClickSim}
                   onTriggerGeminiScanSim={handleTriggerGeminiScanSim}
                   isScanningAi={isScanningAi}
+                  onTriggerMotorAutopilot={handleTriggerMotorAutopilotSim}
+                  isAutopilotRunning={isAutopilotRunning}
                 />
               </div>
             </motion.div>

@@ -23,7 +23,11 @@ import {
   Keyboard,
   Shield,
   RefreshCw,
-  Cpu
+  Cpu,
+  Timer,
+  Magnet,
+  ShieldAlert,
+  Wand2
 } from 'lucide-react';
 
 interface ExtensionHudProps {
@@ -40,6 +44,8 @@ interface ExtensionHudProps {
   onTriggerRageClickSim: () => void;
   onTriggerGeminiScanSim: () => void;
   isScanningAi: boolean;
+  onTriggerMotorAutopilot?: () => void;
+  isAutopilotRunning?: boolean;
 }
 
 export const ExtensionHud: React.FC<ExtensionHudProps> = ({
@@ -55,7 +61,9 @@ export const ExtensionHud: React.FC<ExtensionHudProps> = ({
   telemetryLogs,
   onTriggerRageClickSim,
   onTriggerGeminiScanSim,
-  isScanningAi
+  isScanningAi,
+  onTriggerMotorAutopilot,
+  isAutopilotRunning
 }) => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [showTelemetryDrawer, setShowTelemetryDrawer] = useState(true);
@@ -374,7 +382,7 @@ export const ExtensionHud: React.FC<ExtensionHudProps> = ({
             />
           </div>
 
-          <div className="flex items-center justify-between py-1">
+          <div className="flex items-center justify-between py-1 border-b border-slate-800/50">
             <div>
               <span className="text-slate-300 block font-medium">Steady Click Feature</span>
               <span className="text-[10px] text-slate-500">Debounce & tremor filter to reduce accidental clicks and precision requirements</span>
@@ -386,6 +394,87 @@ export const ExtensionHud: React.FC<ExtensionHudProps> = ({
               className="w-4 h-4 rounded accent-amber-500 cursor-pointer"
             />
           </div>
+
+          {/* Virtual Dwell-Click (Zero-Click Navigation) */}
+          <div className="py-1 border-b border-slate-800/50">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-slate-300 block font-medium flex items-center gap-1.5">
+                  <Timer size={12} className="text-amber-400" />
+                  <span>Virtual Dwell-Click</span>
+                </span>
+                <span className="text-[10px] text-slate-500">Zero physical click force (ALS / Eye-Gaze / Head-Pointer)</span>
+              </div>
+              <input
+                type="checkbox"
+                checked={motor.dwellClick}
+                onChange={(e) => onUpdateMotor({ dwellClick: e.target.checked })}
+                className="w-4 h-4 rounded accent-amber-500 cursor-pointer"
+              />
+            </div>
+            {motor.dwellClick && (
+              <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-400 bg-slate-900/80 px-2 py-1 rounded">
+                <span>Countdown Delay:</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => onUpdateMotor({ dwellDelay: 500 })}
+                    className={`px-1.5 py-0.5 rounded ${motor.dwellDelay === 500 ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-slate-300'}`}
+                  >
+                    500ms
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateMotor({ dwellDelay: 750 })}
+                    className={`px-1.5 py-0.5 rounded ${motor.dwellDelay === 750 ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-slate-300'}`}
+                  >
+                    750ms
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateMotor({ dwellDelay: 1000 })}
+                    className={`px-1.5 py-0.5 rounded ${motor.dwellDelay === 1000 ? 'bg-amber-500 text-black font-bold' : 'bg-slate-800 text-slate-300'}`}
+                  >
+                    1000ms
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Magnetic Target Gravity */}
+          <div className="flex items-center justify-between py-1 border-b border-slate-800/50">
+            <div>
+              <span className="text-slate-300 block font-medium flex items-center gap-1.5">
+                <Magnet size={12} className="text-amber-400" />
+                <span>Target Gravity & Snapping</span>
+              </span>
+              <span className="text-[10px] text-slate-500">Dynamic magnetic field pulls cursor to nearest button (Tremor stabilizer)</span>
+            </div>
+            <input
+              type="checkbox"
+              checked={motor.magneticGravity}
+              onChange={(e) => onUpdateMotor({ magneticGravity: e.target.checked })}
+              className="w-4 h-4 rounded accent-amber-500 cursor-pointer"
+            />
+          </div>
+
+          {/* Hold-to-Confirm Spasm Protection */}
+          <div className="flex items-center justify-between py-1">
+            <div>
+              <span className="text-slate-300 block font-medium flex items-center gap-1.5">
+                <ShieldAlert size={12} className="text-amber-400" />
+                <span>Hold-to-Confirm (Spasm Shield)</span>
+              </span>
+              <span className="text-[10px] text-slate-500">Requires 600ms hold on destructive actions to prevent accidental spasm triggers</span>
+            </div>
+            <input
+              type="checkbox"
+              checked={motor.holdToConfirm}
+              onChange={(e) => onUpdateMotor({ holdToConfirm: e.target.checked })}
+              className="w-4 h-4 rounded accent-amber-500 cursor-pointer"
+            />
+          </div>
         </div>
 
         {/* Interactive Triggers for Judges & Evaluators */}
@@ -393,26 +482,37 @@ export const ExtensionHud: React.FC<ExtensionHudProps> = ({
           <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1.5">
             Judge Simulation Triggers (Slide 10)
           </span>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-1.5">
             <button
               type="button"
               onClick={onTriggerRageClickSim}
-              className="p-2 rounded-lg bg-rose-950/60 border border-rose-700/60 hover:bg-rose-900/60 text-rose-200 font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+              className="p-2 rounded-lg bg-rose-950/60 border border-rose-700/60 hover:bg-rose-900/60 text-rose-200 font-semibold text-[10px] flex flex-col items-center justify-center gap-1 text-center transition-colors shadow-sm"
               title="Simulates user repeatedly missing target to trigger Reinforcement Learning adaptation"
             >
               <Zap size={13} className="text-rose-400" />
-              <span>Simulate Rage-Click</span>
+              <span>Rage-Click (RL)</span>
             </button>
 
             <button
               type="button"
               disabled={isScanningAi}
               onClick={onTriggerGeminiScanSim}
-              className="p-2 rounded-lg bg-cyan-950/60 border border-cyan-700/60 hover:bg-cyan-900/60 text-cyan-200 font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
+              className="p-2 rounded-lg bg-cyan-950/60 border border-cyan-700/60 hover:bg-cyan-900/60 text-cyan-200 font-semibold text-[10px] flex flex-col items-center justify-center gap-1 text-center transition-colors shadow-sm disabled:opacity-50"
               title="Simulates Gemini 1.5/2.0 multimodal visual analysis of unlabelled DOM nodes"
             >
               <Cpu size={13} className={isScanningAi ? "animate-spin text-cyan-400" : "text-cyan-400"} />
-              <span>{isScanningAi ? "Scanning DOM..." : "Gemini Vision Scan"}</span>
+              <span>{isScanningAi ? "Scanning..." : "Vision Scan"}</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={isAutopilotRunning}
+              onClick={onTriggerMotorAutopilot}
+              className="p-2 rounded-lg bg-amber-950/60 border border-amber-600/60 hover:bg-amber-900/60 text-amber-200 font-semibold text-[10px] flex flex-col items-center justify-center gap-1 text-center transition-colors shadow-sm disabled:opacity-50"
+              title="Simulates Gemini 2.0 Flash Form Intent Synthesis to auto-fill form in 1 macro action"
+            >
+              <Wand2 size={13} className={isAutopilotRunning ? "animate-spin text-amber-400" : "text-amber-400"} />
+              <span>{isAutopilotRunning ? "Synthesizing..." : "Motor AI"}</span>
             </button>
           </div>
         </div>

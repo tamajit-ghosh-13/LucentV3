@@ -18,7 +18,9 @@ import {
   Edit3, 
   Check,
   ShieldCheck,
-  MousePointer2
+  MousePointer2,
+  Timer,
+  Magnet
 } from 'lucide-react';
 
 interface TargetPortalProps {
@@ -42,6 +44,15 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [steadyIndicator, setSteadyIndicator] = useState<{ x: number; y: number; active: boolean } | null>(null);
   const lastClickTimeRef = useRef<number>(0);
+
+  // Advanced Motor State: Dwell-Click, Hold-to-Confirm, and Target Gravity
+  const [dwellState, setDwellState] = useState<{ id: string; progress: number; x: number; y: number } | null>(null);
+  const dwellTimerRef = useRef<number | null>(null);
+
+  const [holdingTarget, setHoldingTarget] = useState<{ id: string; progress: number } | null>(null);
+  const holdTimerRef = useRef<number | null>(null);
+
+  const [magneticTargetId, setMagneticTargetId] = useState<string | null>(null);
 
   const [dependents, setDependents] = useState([
     { id: 1, name: "Marcus Vance", relation: "Spouse", dob: "1988-04-12" },
@@ -86,6 +97,112 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
     callback();
   };
 
+  // Virtual Dwell-Click (Zero-Click Navigation for Quadriplegia/ALS/Eye-gaze)
+  const handleDwellEnter = (
+    id: string, 
+    actionName: string, 
+    callback: () => void, 
+    e: React.MouseEvent<HTMLElement>
+  ) => {
+    if (!motor.dwellClick) return;
+    if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const startTime = Date.now();
+    const delay = motor.dwellDelay || 750;
+
+    setDwellState({ id, progress: 0, x: rect.left + rect.width / 2, y: rect.top - 14 });
+
+    dwellTimerRef.current = window.setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const prog = Math.min(100, (elapsed / delay) * 100);
+      setDwellState(prev => prev ? { ...prev, progress: prog } : null);
+
+      if (elapsed >= delay) {
+        if (dwellTimerRef.current) clearInterval(dwellTimerRef.current);
+        dwellTimerRef.current = null;
+        setDwellState(null);
+        onElementAction(`Zero-Click Dwell triggered [${actionName}] after ${delay}ms hover`);
+        callback();
+      }
+    }, 25);
+  };
+
+  const handleDwellLeave = () => {
+    if (dwellTimerRef.current) {
+      clearInterval(dwellTimerRef.current);
+      dwellTimerRef.current = null;
+    }
+    setDwellState(null);
+  };
+
+  // Hold-to-Confirm for Destructive Actions (Spasm & Involuntary Jerk Protection)
+  const handleHoldStart = (id: string, actionName: string, callback: () => void) => {
+    if (!motor.holdToConfirm) {
+      callback();
+      return;
+    }
+    if (holdTimerRef.current) clearInterval(holdTimerRef.current);
+
+    const startTime = Date.now();
+    const requiredHoldMs = 600;
+    setHoldingTarget({ id, progress: 0 });
+
+    holdTimerRef.current = window.setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const prog = Math.min(100, (elapsed / requiredHoldMs) * 100);
+      setHoldingTarget({ id, progress: prog });
+
+      if (elapsed >= requiredHoldMs) {
+        if (holdTimerRef.current) clearInterval(holdTimerRef.current);
+        holdTimerRef.current = null;
+        setHoldingTarget(null);
+        onElementAction(`Hold-to-Confirm verified (sustained ${requiredHoldMs}ms): executed [${actionName}]`);
+        callback();
+      }
+    }, 20);
+  };
+
+  const handleHoldEnd = (id: string, actionName: string) => {
+    if (!motor.holdToConfirm) return;
+    if (holdTimerRef.current) {
+      clearInterval(holdTimerRef.current);
+      holdTimerRef.current = null;
+      setHoldingTarget(null);
+      onElementAction(`Spasm Filter: absorbed premature trigger on [${actionName}] (<600ms hold)`);
+    }
+  };
+
+  // Magnetic Target Gravity Proximity Detection
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!motor.magneticGravity) {
+      if (magneticTargetId) setMagneticTargetId(null);
+      return;
+    }
+
+    const mouseX = e.clientX;
+    const mouseY = e.clientY;
+    const targets = document.querySelectorAll<HTMLElement>('[data-magnetic="true"]');
+    let closestId: string | null = null;
+    let minDistance = 50;
+
+    targets.forEach(el => {
+      const rect = el.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const dist = Math.hypot(mouseX - centerX, mouseY - centerY);
+
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestId = el.id || el.getAttribute('data-shortcut') || null;
+      }
+    });
+
+    if (closestId !== magneticTargetId) {
+      setMagneticTargetId(closestId);
+    }
+  };
+
   // Base typography & contrast classes based on active profile settings
   const isHighContrast = visual.highContrast;
   const isDarkSlate = isHighContrast && visual.contrastTheme === 'dark-slate';
@@ -123,6 +240,7 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
 
   return (
     <div 
+      onMouseMove={handleMouseMove}
       className={`min-h-full transition-colors duration-300 p-4 sm:p-8 ${bgMain} ${isDyslexic ? 'font-dyslexic' : 'font-sans'} relative`}
       style={containerStyle}
     >
@@ -145,6 +263,41 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
             />
             <div className="absolute text-[10px] font-bold text-amber-300 bg-black/80 px-1.5 py-0.5 rounded shadow whitespace-nowrap">
               Steady Click ✓
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Virtual Dwell-Click Radial Countdown Overlay (Zero-Click Navigation) */}
+      <AnimatePresence>
+        {dwellState && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.6 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.6 }}
+            transition={{ duration: 0.15 }}
+            className="fixed pointer-events-none z-50 transform -translate-x-1/2 -translate-y-full flex flex-col items-center"
+            style={{ left: dwellState.x, top: dwellState.y }}
+          >
+            <div className="relative w-9 h-9 flex items-center justify-center filter drop-shadow-md">
+              <svg className="w-9 h-9 -rotate-90">
+                <circle cx="18" cy="18" r="14" className="stroke-slate-900 fill-black/80" strokeWidth="3" />
+                <circle 
+                  cx="18" 
+                  cy="18" 
+                  r="14" 
+                  className="stroke-amber-400 fill-none transition-all duration-75" 
+                  strokeWidth="3.5" 
+                  strokeDasharray={87.96} 
+                  strokeDashoffset={87.96 - (87.96 * dwellState.progress / 100)} 
+                />
+              </svg>
+              <span className="absolute text-[9px] font-black text-amber-300 font-mono">
+                {Math.round(dwellState.progress)}%
+              </span>
+            </div>
+            <div className="text-[9px] font-bold text-amber-300 bg-black/90 border border-amber-500/50 px-1.5 py-0.5 rounded shadow whitespace-nowrap mt-0.5">
+              Dwell Triggering...
             </div>
           </motion.div>
         )}
@@ -263,9 +416,16 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
                   type="button"
                   id="btn-portal-help"
                   data-shortcut="1"
+                  data-magnetic="true"
                   aria-label={visual.aiVisionLabelsEnabled ? PORTAL_DATA.unlabelledIcons[0].aiLabel : undefined}
-                  onMouseEnter={() => visual.aiVisionLabelsEnabled && setActiveTooltip('help')}
-                  onMouseLeave={() => setActiveTooltip(null)}
+                  onMouseEnter={(e) => {
+                    visual.aiVisionLabelsEnabled && setActiveTooltip('help');
+                    handleDwellEnter('btn-portal-help', 'Help Icon', () => onElementAction('Clicked Help Icon (Section 42-A)'), e);
+                  }}
+                  onMouseLeave={() => {
+                    setActiveTooltip(null);
+                    handleDwellLeave();
+                  }}
                   onClick={(e) => handleProtectedClick(e, 'Clicked Help Icon', () => onElementAction('Clicked Help Icon (Section 42-A)'))}
                   className={`transition-all duration-200 flex items-center justify-center relative ${
                     isHitboxExpanded 
@@ -273,7 +433,7 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
                       : 'w-6 h-6 p-1 rounded border border-slate-300 bg-slate-100 hover:bg-slate-200'
                   } ${isHighContrast ? (isDarkSlate ? 'bg-black text-cyan-300 border-cyan-400' : 'bg-black text-yellow-300 border-yellow-400') : 'text-slate-600'} ${
                     visual.aiVisionLabelsEnabled ? 'ring-2 ring-indigo-400/50' : ''
-                  } ${tabHaloClass}`}
+                  } ${magneticTargetId === 'btn-portal-help' || magneticTargetId === '1' ? 'ring-4 ring-amber-400 shadow-lg shadow-amber-400/30 scale-110' : ''} ${tabHaloClass}`}
                 >
                   <HelpCircle size={isHitboxExpanded ? 20 : 13} />
                   {isHitboxExpanded && (
@@ -308,9 +468,16 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
                   type="button"
                   id="btn-portal-save"
                   data-shortcut="2"
+                  data-magnetic="true"
                   aria-label={visual.aiVisionLabelsEnabled ? PORTAL_DATA.unlabelledIcons[1].aiLabel : undefined}
-                  onMouseEnter={() => visual.aiVisionLabelsEnabled && setActiveTooltip('save')}
-                  onMouseLeave={() => setActiveTooltip(null)}
+                  onMouseEnter={(e) => {
+                    visual.aiVisionLabelsEnabled && setActiveTooltip('save');
+                    handleDwellEnter('btn-portal-save', 'Save Draft', () => onElementAction('Saved Draft to Cloud'), e);
+                  }}
+                  onMouseLeave={() => {
+                    setActiveTooltip(null);
+                    handleDwellLeave();
+                  }}
                   onClick={(e) => handleProtectedClick(e, 'Saved Draft', () => onElementAction('Saved Draft to Cloud'))}
                   className={`transition-all duration-200 flex items-center justify-center relative ${
                     isHitboxExpanded 
@@ -318,7 +485,7 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
                       : 'w-6 h-6 p-1 rounded border border-slate-300 bg-slate-100 hover:bg-slate-200'
                   } ${isHighContrast ? (isDarkSlate ? 'bg-black text-cyan-300 border-cyan-400' : 'bg-black text-yellow-300 border-yellow-400') : 'text-slate-600'} ${
                     visual.aiVisionLabelsEnabled ? 'ring-2 ring-indigo-400/50' : ''
-                  } ${tabHaloClass}`}
+                  } ${magneticTargetId === 'btn-portal-save' || magneticTargetId === '2' ? 'ring-4 ring-amber-400 shadow-lg shadow-amber-400/30 scale-110' : ''} ${tabHaloClass}`}
                 >
                   <Save size={isHitboxExpanded ? 20 : 13} />
                   {isFocusNav && (
@@ -350,9 +517,16 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
                   type="button"
                   id="btn-portal-inspect"
                   data-shortcut="3"
+                  data-magnetic="true"
                   aria-label={visual.aiVisionLabelsEnabled ? PORTAL_DATA.unlabelledIcons[2].aiLabel : undefined}
-                  onMouseEnter={() => visual.aiVisionLabelsEnabled && setActiveTooltip('inspect')}
-                  onMouseLeave={() => setActiveTooltip(null)}
+                  onMouseEnter={(e) => {
+                    visual.aiVisionLabelsEnabled && setActiveTooltip('inspect');
+                    handleDwellEnter('btn-portal-inspect', 'Inspect Worksheet', () => onElementAction('Previewed Tax Worksheet'), e);
+                  }}
+                  onMouseLeave={() => {
+                    setActiveTooltip(null);
+                    handleDwellLeave();
+                  }}
                   onClick={(e) => handleProtectedClick(e, 'Previewed Worksheet', () => onElementAction('Previewed Tax Worksheet'))}
                   className={`transition-all duration-200 flex items-center justify-center relative ${
                     isHitboxExpanded 
@@ -360,7 +534,7 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
                       : 'w-6 h-6 p-1 rounded border border-slate-300 bg-slate-100 hover:bg-slate-200'
                   } ${isHighContrast ? (isDarkSlate ? 'bg-black text-cyan-300 border-cyan-400' : 'bg-black text-yellow-300 border-yellow-400') : 'text-slate-600'} ${
                     visual.aiVisionLabelsEnabled ? 'ring-2 ring-indigo-400/50' : ''
-                  } ${tabHaloClass}`}
+                  } ${magneticTargetId === 'btn-portal-inspect' || magneticTargetId === '3' ? 'ring-4 ring-amber-400 shadow-lg shadow-amber-400/30 scale-110' : ''} ${tabHaloClass}`}
                 >
                   <FileSearch size={isHitboxExpanded ? 20 : 13} />
                   {isFocusNav && (
@@ -392,9 +566,16 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
                   type="button"
                   id="btn-portal-shield"
                   data-shortcut="4"
+                  data-magnetic="true"
                   aria-label={visual.aiVisionLabelsEnabled ? PORTAL_DATA.unlabelledIcons[4].aiLabel : undefined}
-                  onMouseEnter={() => visual.aiVisionLabelsEnabled && setActiveTooltip('shield')}
-                  onMouseLeave={() => setActiveTooltip(null)}
+                  onMouseEnter={(e) => {
+                    visual.aiVisionLabelsEnabled && setActiveTooltip('shield');
+                    handleDwellEnter('btn-portal-shield', 'Verify Signature', () => onElementAction('Checked Cryptographic Signature'), e);
+                  }}
+                  onMouseLeave={() => {
+                    setActiveTooltip(null);
+                    handleDwellLeave();
+                  }}
                   onClick={(e) => handleProtectedClick(e, 'Checked Cryptographic Signature', () => onElementAction('Checked Cryptographic Signature'))}
                   className={`transition-all duration-200 flex items-center justify-center relative ${
                     isHitboxExpanded 
@@ -402,7 +583,7 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
                       : 'w-6 h-6 p-1 rounded border border-slate-300 bg-slate-100 hover:bg-slate-200'
                   } ${isHighContrast ? (isDarkSlate ? 'bg-black text-cyan-300 border-cyan-400' : 'bg-black text-yellow-300 border-yellow-400') : 'text-slate-600'} ${
                     visual.aiVisionLabelsEnabled ? 'ring-2 ring-indigo-400/50' : ''
-                  } ${tabHaloClass}`}
+                  } ${magneticTargetId === 'btn-portal-shield' || magneticTargetId === '4' ? 'ring-4 ring-amber-400 shadow-lg shadow-amber-400/30 scale-110' : ''} ${tabHaloClass}`}
                 >
                   <ShieldAlert size={isHitboxExpanded ? 20 : 13} />
                   {isFocusNav && (
@@ -492,24 +673,63 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
           </div>
 
           {/* =============================================================== */}
+          {/* GEMINI MOTOR AUTOPILOT STATUS BANNER (1-Click Form Synthesis)   */}
+          {/* =============================================================== */}
+          <AnimatePresence>
+            {motor.motorAutopilotActive && (
+              <motion.div 
+                initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="my-4 p-3.5 rounded-xl bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-teal-500/20 border-2 border-emerald-400/80 shadow-lg text-xs text-emerald-300 flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
+                    <Sparkles size={16} />
+                  </div>
+                  <div>
+                    <span className="font-bold text-emerald-200 block text-xs">Gemini Motor Autopilot Active</span>
+                    <span className="text-[11px] text-emerald-300/80">Synthesized and populated verified declarations — eliminated 15 repetitive fine-motor clicks and typing actions.</span>
+                  </div>
+                </div>
+                <span className="shrink-0 text-[10px] bg-emerald-500/30 border border-emerald-400/50 text-emerald-200 px-2 py-0.5 rounded font-mono font-bold">
+                  15 ACTIONS ➔ 1
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* =============================================================== */}
           {/* FORM INPUTS WITH SUB-24px CLICK TARGETS                          */}
           {/* =============================================================== */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 my-6">
             <div>
-              <label 
-                htmlFor="input-resident-id"
-                className={`block text-xs font-semibold mb-1.5 ${
-                  isHighContrast ? (isDarkSlate ? 'text-cyan-300' : 'text-yellow-300') : 'text-slate-700'
-                }`}
-              >
-                National Resident Registry ID
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label 
+                  htmlFor="input-resident-id"
+                  className={`block text-xs font-semibold ${
+                    isHighContrast ? (isDarkSlate ? 'text-cyan-300' : 'text-yellow-300') : 'text-slate-700'
+                  }`}
+                >
+                  National Resident Registry ID
+                </label>
+                {motor.motorAutopilotActive && (
+                  <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 font-bold">
+                    <Sparkles size={11} />
+                    <span>Autopilot Verified</span>
+                  </span>
+                )}
+              </div>
               <input
                 id="input-resident-id"
                 type="text"
                 defaultValue="RES-8821-CIVIC-90"
+                value={motor.motorAutopilotActive ? "RES-8821-CIVIC-90 [VERIFIED]" : undefined}
+                readOnly={motor.motorAutopilotActive}
                 className={`w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-lg border transition-all ${
-                  isHighContrast 
+                  motor.motorAutopilotActive
+                    ? 'border-emerald-400 ring-2 ring-emerald-400/40 bg-emerald-950/20 text-emerald-200'
+                    : isHighContrast 
                     ? (isDarkSlate ? 'bg-black text-cyan-300 border-cyan-400 focus:ring-2 focus:ring-cyan-400' : 'bg-black text-yellow-300 border-yellow-400 focus:ring-2 focus:ring-yellow-400')
                     : 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500'
                 } ${tabHaloClass}`}
@@ -517,20 +737,32 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
             </div>
 
             <div>
-              <label 
-                htmlFor="input-household-income"
-                className={`block text-xs font-semibold mb-1.5 ${
-                  isHighContrast ? (isDarkSlate ? 'text-cyan-300' : 'text-yellow-300') : 'text-slate-700'
-                }`}
-              >
-                Annualized Imputed Income ($)
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label 
+                  htmlFor="input-household-income"
+                  className={`block text-xs font-semibold ${
+                    isHighContrast ? (isDarkSlate ? 'text-cyan-300' : 'text-yellow-300') : 'text-slate-700'
+                  }`}
+                >
+                  Annualized Imputed Income ($)
+                </label>
+                {motor.motorAutopilotActive && (
+                  <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 font-bold">
+                    <Sparkles size={11} />
+                    <span>IRS Telefile Synced</span>
+                  </span>
+                )}
+              </div>
               <input
                 id="input-household-income"
                 type="text"
                 defaultValue="52,400.00"
+                value={motor.motorAutopilotActive ? "52,400.00 [IRS AUDIT SYNCED]" : undefined}
+                readOnly={motor.motorAutopilotActive}
                 className={`w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-lg border transition-all ${
-                  isHighContrast 
+                  motor.motorAutopilotActive
+                    ? 'border-emerald-400 ring-2 ring-emerald-400/40 bg-emerald-950/20 text-emerald-200'
+                    : isHighContrast 
                     ? (isDarkSlate ? 'bg-black text-cyan-300 border-cyan-400 focus:ring-2 focus:ring-cyan-400' : 'bg-black text-yellow-300 border-yellow-400 focus:ring-2 focus:ring-yellow-400')
                     : 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500'
                 } ${tabHaloClass}`}
@@ -603,12 +835,17 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
                         whileTap={{ scale: 0.95 }}
                         type="button"
                         data-shortcut={String(5 + idx * 2)}
+                        data-magnetic="true"
+                        onMouseEnter={(e) => handleDwellEnter(`dep-edit-${dep.id}`, `Editing ${dep.name}`, () => onElementAction(`Editing ${dep.name}`), e)}
+                        onMouseLeave={handleDwellLeave}
                         onClick={(e) => handleProtectedClick(e, `Editing ${dep.name}`, () => onElementAction(`Editing ${dep.name}`))}
                         className={`transition-all duration-200 flex items-center justify-center font-medium relative ${
                           isHitboxExpanded 
                             ? 'min-w-[48px] min-h-[48px] px-3.5 py-2.5 rounded-xl text-xs bg-blue-600 text-white hover:bg-blue-700 shadow-md border-2 border-blue-400 ring-2 ring-blue-300/40' 
                             : 'h-5 px-1.5 text-[10px] rounded bg-slate-200 text-slate-700 hover:bg-slate-300'
-                        } ${isHighContrast ? (isDarkSlate ? 'bg-black text-cyan-300 border-2 border-cyan-400' : 'bg-black text-yellow-300 border-2 border-yellow-400') : ''} ${tabHaloClass}`}
+                        } ${isHighContrast ? (isDarkSlate ? 'bg-black text-cyan-300 border-2 border-cyan-400' : 'bg-black text-yellow-300 border-2 border-yellow-400') : ''} ${
+                          magneticTargetId === String(5 + idx * 2) ? 'ring-4 ring-amber-400 shadow-lg scale-105' : ''
+                        } ${tabHaloClass}`}
                       >
                         <Edit3 size={isHitboxExpanded ? 16 : 10} className={isHitboxExpanded ? "mr-1.5" : "mr-1"} />
                         <span>Edit</span>
@@ -619,21 +856,47 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
                         )}
                       </motion.button>
 
-                      {/* Delete Dependent Button (Shortcut: 6, 8) */}
+                      {/* Delete Dependent Button (Shortcut: 6, 8) - PROTECTED WITH HOLD-TO-CONFIRM */}
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         type="button"
                         data-shortcut={String(6 + idx * 2)}
-                        onClick={(e) => handleProtectedClick(e, `Remove ${dep.name}`, () => removeDependent(dep.id))}
-                        className={`transition-all duration-200 flex items-center justify-center font-medium relative ${
+                        data-magnetic="true"
+                        onMouseEnter={(e) => handleDwellEnter(`dep-del-${dep.id}`, `Remove ${dep.name}`, () => removeDependent(dep.id), e)}
+                        onMouseDown={() => handleHoldStart(`dep-del-${dep.id}`, `Remove ${dep.name}`, () => removeDependent(dep.id))}
+                        onMouseUp={() => handleHoldEnd(`dep-del-${dep.id}`, `Remove ${dep.name}`)}
+                        onMouseLeave={() => {
+                          handleHoldEnd(`dep-del-${dep.id}`, `Remove ${dep.name}`);
+                          handleDwellLeave();
+                        }}
+                        onClick={(e) => {
+                          if (motor.holdToConfirm) {
+                            e.preventDefault();
+                            onElementAction(`Spasm Guard: Hold button for 600ms to remove ${dep.name}`);
+                          } else {
+                            handleProtectedClick(e, `Remove ${dep.name}`, () => removeDependent(dep.id));
+                          }
+                        }}
+                        className={`transition-all duration-200 flex items-center justify-center font-medium relative overflow-hidden ${
                           isHitboxExpanded 
                             ? 'min-w-[48px] min-h-[48px] px-3.5 py-2.5 rounded-xl text-xs bg-rose-600 text-white hover:bg-rose-700 shadow-md border-2 border-rose-400 ring-2 ring-rose-300/40' 
                             : 'h-5 px-1.5 text-[10px] rounded bg-slate-200 text-rose-700 hover:bg-rose-100'
-                        } ${isHighContrast ? (isDarkSlate ? 'bg-black text-rose-300 border-2 border-rose-400' : 'bg-black text-yellow-300 border-2 border-yellow-400') : ''} ${tabHaloClass}`}
+                        } ${isHighContrast ? (isDarkSlate ? 'bg-black text-rose-300 border-2 border-rose-400' : 'bg-black text-yellow-300 border-2 border-yellow-400') : ''} ${
+                          magneticTargetId === String(6 + idx * 2) ? 'ring-4 ring-amber-400 shadow-lg scale-105' : ''
+                        } ${tabHaloClass}`}
                       >
-                        <Trash2 size={isHitboxExpanded ? 16 : 10} className={isHitboxExpanded ? "mr-1.5" : "mr-1"} />
-                        <span>Remove</span>
+                        {/* Spasm Hold Progress Fill */}
+                        {holdingTarget?.id === `dep-del-${dep.id}` && (
+                          <div 
+                            className="absolute inset-0 bg-rose-950/80 transition-all duration-75"
+                            style={{ width: `${holdingTarget.progress}%` }}
+                          />
+                        )}
+                        <Trash2 size={isHitboxExpanded ? 16 : 10} className={`${isHitboxExpanded ? "mr-1.5" : "mr-1"} relative z-10`} />
+                        <span className="relative z-10">
+                          {holdingTarget?.id === `dep-del-${dep.id}` ? `Hold ${Math.round(holdingTarget.progress)}%` : 'Remove'}
+                        </span>
                         {isFocusNav && (
                           <span className="absolute -top-2.5 -right-2.5 bg-amber-400 text-black font-black text-[11px] w-5 h-5 rounded-full flex items-center justify-center shadow-lg border border-black z-30">
                             {6 + idx * 2}
@@ -651,19 +914,57 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
           {/* PRIMARY FORM SUBMISSION BAR & RAGE-CLICK DEMO AREA               */}
           {/* =============================================================== */}
           <div className={`mt-8 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t ${headerBorder}`}>
-            <button
-              type="button"
-              id="btn-portal-cancel"
-              data-shortcut="0"
-              onClick={(e) => handleProtectedClick(e, 'Cancelled Draft', () => onElementAction('Cancelled Draft'))}
-              className={`transition-all text-xs font-semibold ${
-                isHitboxExpanded 
-                  ? 'min-h-[48px] px-4 py-2.5 rounded-xl border-2 border-slate-300 hover:bg-slate-100' 
-                  : 'text-slate-400 hover:text-slate-600'
-              } ${isHighContrast ? (isDarkSlate ? 'text-cyan-300 hover:text-cyan-100 border-cyan-400' : 'text-yellow-300 hover:text-yellow-100 border-yellow-400') : ''} ${tabHaloClass}`}
-            >
-              Discard Declaration
-            </button>
+            {/* Discard Button with Hold-to-Confirm Spasm Protection */}
+            <div className="relative">
+              <button
+                type="button"
+                id="btn-portal-cancel"
+                data-shortcut="0"
+                data-magnetic="true"
+                onMouseEnter={(e) => handleDwellEnter('btn-portal-cancel', 'Discard Declaration', () => onElementAction('Cancelled Draft'), e)}
+                onMouseDown={() => handleHoldStart('btn-portal-cancel', 'Discard Declaration', () => onElementAction('Cancelled Draft'))}
+                onMouseUp={() => handleHoldEnd('btn-portal-cancel', 'Discard Declaration')}
+                onMouseLeave={() => {
+                  handleHoldEnd('btn-portal-cancel', 'Discard Declaration');
+                  handleDwellLeave();
+                }}
+                onClick={(e) => {
+                  if (motor.holdToConfirm) {
+                    e.preventDefault();
+                    onElementAction('Spasm Shield: Hold for 600ms to confirm discard');
+                  } else {
+                    handleProtectedClick(e, 'Cancelled Draft', () => onElementAction('Cancelled Draft'));
+                  }
+                }}
+                className={`transition-all text-xs font-semibold relative overflow-hidden ${
+                  isHitboxExpanded 
+                    ? 'min-h-[48px] px-4 py-2.5 rounded-xl border-2 border-slate-300 hover:bg-slate-100' 
+                    : 'text-slate-400 hover:text-slate-600'
+                } ${isHighContrast ? (isDarkSlate ? 'text-cyan-300 hover:text-cyan-100 border-cyan-400' : 'text-yellow-300 hover:text-yellow-100 border-yellow-400') : ''} ${
+                  magneticTargetId === 'btn-portal-cancel' || magneticTargetId === '0' ? 'ring-4 ring-amber-400 shadow-md scale-105' : ''
+                } ${tabHaloClass}`}
+              >
+                {/* Hold Progress Bar */}
+                {holdingTarget?.id === 'btn-portal-cancel' && (
+                  <div 
+                    className="absolute inset-0 bg-rose-500/25 transition-all duration-75"
+                    style={{ width: `${holdingTarget.progress}%` }}
+                  />
+                )}
+                <span className="relative z-10">
+                  {holdingTarget?.id === 'btn-portal-cancel' 
+                    ? `Holding ${Math.round(holdingTarget.progress)}%...` 
+                    : motor.holdToConfirm 
+                    ? 'Discard (Hold 600ms)' 
+                    : 'Discard Declaration'}
+                </span>
+                {isFocusNav && (
+                  <span className="absolute -top-2.5 -right-2 bg-amber-400 text-black font-black text-[11px] w-5 h-5 rounded-full flex items-center justify-center shadow-lg border border-black z-30">
+                    0
+                  </span>
+                )}
+              </button>
+            </div>
 
             <div className="flex items-center gap-4 w-full sm:w-auto justify-end">
               <div className="text-right hidden sm:block">
@@ -675,7 +976,7 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
                 </div>
               </div>
 
-              {/* Submit Button (Target of Rage-Click Simulation & Shortcut: 9) */}
+              {/* Submit Button (Target of Rage-Click Simulation & Shortcut: 9 & Dwell Click) */}
               <div className="relative">
                 <motion.button
                   whileHover={{ scale: 1.02 }}
@@ -688,6 +989,12 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
                   type="button"
                   id="btn-portal-submit"
                   data-shortcut="9"
+                  data-magnetic="true"
+                  onMouseEnter={(e) => handleDwellEnter('btn-portal-submit', 'Submit Form 104-B', () => {
+                    setFormSubmitted(true);
+                    onElementAction('Submitted Form 104-B via Dwell Click');
+                  }, e)}
+                  onMouseLeave={handleDwellLeave}
                   onClick={(e) => handleProtectedClick(e, 'Submitted Form 104-B', () => {
                     setFormSubmitted(true);
                     onElementAction('Submitted Form 104-B');
@@ -700,6 +1007,8 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
                     isHighContrast 
                       ? (isDarkSlate ? 'bg-cyan-400 hover:bg-cyan-300 text-black font-black border-2 border-cyan-200' : 'bg-yellow-400 hover:bg-yellow-300 text-black font-black border-2 border-yellow-200') 
                       : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  } ${
+                    magneticTargetId === 'btn-portal-submit' || magneticTargetId === '9' ? 'ring-4 ring-amber-400 shadow-2xl shadow-amber-400/50 scale-105' : ''
                   } ${tabHaloClass}`}
                 >
                   <CheckCircle2 size={isHitboxExpanded ? 18 : 14} />
@@ -755,12 +1064,30 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
         </main>
 
         {/* Footer info note */}
-        <div className="text-center text-xs text-slate-400 font-mono pt-4 flex items-center justify-center gap-2">
+        <div className="text-center text-xs text-slate-400 font-mono pt-4 flex flex-wrap items-center justify-center gap-2">
           <span>Target Site Sandbox: Simulating 3rd-party civic webpage loaded in Chrome Tab.</span>
           {motor.steadyClick && (
             <span className="bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
               <MousePointer2 size={11} />
-              <span>Steady Click Protection Active</span>
+              <span>Steady Click Active</span>
+            </span>
+          )}
+          {motor.dwellClick && (
+            <span className="bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
+              <Timer size={11} />
+              <span>Dwell-Click Active ({motor.dwellDelay || 750}ms)</span>
+            </span>
+          )}
+          {motor.magneticGravity && (
+            <span className="bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
+              <Magnet size={11} />
+              <span>Target Gravity Snapping Active</span>
+            </span>
+          )}
+          {motor.holdToConfirm && (
+            <span className="bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
+              <ShieldCheck size={11} />
+              <span>Spasm Hold Guard Active</span>
             </span>
           )}
         </div>

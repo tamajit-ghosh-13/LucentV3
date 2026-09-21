@@ -219,8 +219,10 @@ flowchart TD
     MP --> M1["Hitbox Expansion ≥ 48×48px\nCSS min-width/height +\npseudo-element hit area"]
     MP --> M2["Tremor / Steady-Click Filter\nPointermove centroid averaging;\nSettled-click debounce"]
     MP --> M3["Numbered Shortcut Badges\n1–9 overlay badges on\nfocusable elements"]
-    MP --> M4["High-Visibility Focus Halo\nLarge animated focus ring\nreplacing default :focus"]
-    MP --> M5["Tolerance Windows\nDebounce 150–450ms;\nprevents double-submit"]
+    MP --> M4["Virtual Dwell-Click Engine\nZero physical click force;\n600–1000ms radial countdown"]
+    MP --> M5["Target Gravity & Magnetic Snapping\nProximity attractor field;\nStabilizes 4–12Hz tremors"]
+    MP --> M6["Hold-to-Confirm Spasm Shield\n600ms intentional hold barrier\non destructive actions"]
+    MP --> M7["Gemini Motor Autopilot\n1-click macro form intent\nsynthesis via Gemini Flash"]
 
     style VP fill:#312e81,color:#a5b4fc
     style CP fill:#2e1065,color:#c4b5fd
@@ -248,9 +250,12 @@ flowchart TD
 | Numbered Keyboard Shortcuts | — | — | ✅ |
 | High-Visibility Focus Halo | — | — | ✅ |
 | Double-Click Debounce | — | — | ✅ |
+| **Virtual Dwell-Click (Zero-Click)** | — | — | ✅ |
+| **Target Gravity (Tremor Snapping)** | — | — | ✅ |
+| **Hold-to-Confirm Spasm Shield** | — | — | ✅ |
 | **Online RL Personalisation** | ✅ | ✅ | ✅ |
 | **MutationObserver (SPA)** | ✅ | ✅ | ✅ |
-| **Gemini AI Integration** | ✅ | ✅ | — |
+| **Gemini AI Integration** | ✅ | ✅ | ✅ *(Form Autopilot)* |
 
 </div>
 

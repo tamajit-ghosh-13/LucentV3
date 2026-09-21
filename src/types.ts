@@ -24,6 +24,11 @@ export interface MotorSettings {
   rageClickAdaptation: boolean;
   doubleClickDebounce: boolean;
   steadyClick: boolean;
+  dwellClick: boolean;
+  dwellDelay: number; // in ms, e.g. 750
+  magneticGravity: boolean;
+  holdToConfirm: boolean;
+  motorAutopilotActive: boolean;
 }
 
 export interface TelemetryLog {
@@ -41,4 +46,6 @@ export interface MutationStats {
   contrastPatchesApplied: number;
   distractionsSuppressed: number;
   shortcutsAssigned: number;
+  dwellClicksTriggered?: number;
+  gravitySnapsApplied?: number;
 }
