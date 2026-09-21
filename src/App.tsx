@@ -1,8 +1,13 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+import { Navigate, Route, Routes } from 'react-router-dom';
 
+import Dashboard from './dashboard/pages/Dashboard';
+import Activity from './dashboard/pages/Activity';
+import Features from './dashboard/pages/Features';
+import Analytics from './dashboard/pages/Analytics';
+import Settings from './dashboard/pages/Settings';
+
+import DashboardLayout from './dashboard/layouts/DashboardLayout';
+import LucentDemo from './LucentDemo';
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   AccessibilityProfile, 
@@ -115,132 +120,48 @@ export default function App() {
   const handleSelectProfile = (profile: AccessibilityProfile) => {
     setCurrentProfile(profile);
 
-    if (profile === 'raw') {
-      setVisual({
-        highContrast: false,
-        contrastTheme: 'yellow-black',
-        fontScale: 100,
-        aiVisionLabelsEnabled: false,
-        magnifierEnabled: false
-      });
-      setCognitive({
-        declutter: false,
-        simplifyText: false,
-        dyslexiaFont: false,
-        readingGuide: false,
-        readingMask: false
-      });
-      setMotor({
-        hitboxExpansion: false,
-        hitboxSize: 48,
-        focusNavigation: false,
-        stickyTargets: false,
-        rageClickAdaptation: true,
-        doubleClickDebounce: true,
-        steadyClick: true
-      });
-      addTelemetryLog('DOM_PATCH', 'Reverted all dynamic DOM patches. Unprotected baseline exposed.', 'rose');
-    } else if (profile === 'visual') {
-      setVisual({
-        highContrast: true,
-        contrastTheme: 'yellow-black',
-        fontScale: 125,
-        aiVisionLabelsEnabled: true,
-        magnifierEnabled: false
-      });
-      setCognitive(prev => ({ ...prev, declutter: false, simplifyText: false }));
-      setMotor(prev => ({ ...prev, hitboxExpansion: false, focusNavigation: false }));
-      addTelemetryLog('AI_GEMINI', 'Activated Visual Impairment Suite: WCAG AAA Contrast + 125% Font Reflow + AI Vision scan', 'purple');
-    } else if (profile === 'cognitive') {
-      setCognitive({
-        declutter: true,
-        simplifyText: true,
-        dyslexiaFont: true,
-        readingGuide: false,
-        readingMask: false
-      });
-      setVisual(prev => ({ ...prev, highContrast: false, fontScale: 110 }));
-      setMotor(prev => ({ ...prev, hitboxExpansion: false, focusNavigation: false }));
-      addTelemetryLog('AI_GEMINI', 'Activated Cognitive & ADHD Suite: Sensory de-clutter + AI text simplification + Dyslexia typography', 'purple');
-    } else if (profile === 'motor') {
-      setMotor({
-        hitboxExpansion: true,
-        hitboxSize: 48,
-        focusNavigation: true,
-        stickyTargets: true,
-        rageClickAdaptation: true,
-        doubleClickDebounce: true,
-        steadyClick: true
-      });
-      setVisual(prev => ({ ...prev, highContrast: false }));
-      setCognitive(prev => ({ ...prev, declutter: false, simplifyText: false }));
-      addTelemetryLog('RL_AGENT', 'Activated Motor Impairment Suite: Targets enlarged to >=48px + [1-9] keyboard shortcuts + tremor filter', 'amber');
-    }
-  };
+export default function App() {
+  return (
+    <Routes>
 
-  // Keyboard shortcut listener for motor visual navigation
-  useEffect(() => {
-    if (!motor.focusNavigation) return;
+      <Route
+        path="/"
+        element={<Navigate to="/dashboard" replace />}
+      />
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept if user is typing in form inputs
-      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
-        return;
-      }
+      <Route element={<DashboardLayout />}>
 
-      if (e.key >= '0' && e.key <= '9') {
-        const targetElement = document.querySelector(`[data-shortcut="${e.key}"]`) as HTMLElement;
-        if (targetElement) {
-          e.preventDefault();
-          targetElement.focus();
-          targetElement.click();
-          addTelemetryLog('USER_TELEMETRY', `Executed direct numbered hotkey [${e.key}] -> Clicked target node`, 'emerald');
-        }
-      }
-    };
+        <Route
+          path="/dashboard"
+          element={<Dashboard />}
+        />
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [motor.focusNavigation, addTelemetryLog]);
+        <Route
+          path="/dashboard/features"
+          element={<Features />}
+        />
 
-  // Simulated Rage Click (Slide 10: Online RL Feedback loop)
-  const handleTriggerRageClickSim = () => {
-    addTelemetryLog('USER_TELEMETRY', 'Simulating rapid repeated clicks on Submit button (#btn-submit)...', 'rose');
-    setRageCount(prev => prev + 1);
+        <Route
+          path="/activity"
+          element={<Activity />}
+        />
 
-    setTimeout(() => {
-      setRageCount(prev => prev + 2);
-    }, 150);
+        <Route
+          path="/dashboard/analytics"
+          element={<Analytics />}
+        />
 
-    setTimeout(() => {
-      setRageCount(prev => prev + 3);
-      addTelemetryLog('RL_AGENT', 'Rage-click threshold exceeded (6 clicks in 350ms)! Triggering Online RL Policy...', 'rose');
-      
-      setTimeout(() => {
-        setMotor(prev => ({ ...prev, hitboxExpansion: true }));
-        addTelemetryLog('RL_AGENT', 'Online RL policy adapted: Expanded touch hitbox target to >= 48px + 20% safety margin', 'emerald');
-        setRageCount(0);
-      }, 400);
-    }, 350);
-  };
+        <Route
+          path="/dashboard/settings"
+          element={<Settings />}
+        />
 
-  // Simulated Gemini Multimodal Vision Scan
-  const handleTriggerGeminiScanSim = () => {
-    setIsScanningAi(true);
-    addTelemetryLog('AI_GEMINI', 'Capturing DOM viewport snapshot -> Sending to Gemini 1.5/2.0 Vision API...', 'purple');
+      </Route>
 
-    setTimeout(() => {
-      setVisual(prev => ({ ...prev, aiVisionLabelsEnabled: true }));
-      setIsScanningAi(false);
-      addTelemetryLog('AI_GEMINI', 'Gemini Vision parsed 4 unlabelled icons: injected descriptive aria-label & tooltips (98.4% mean confidence)', 'emerald');
-    }, 900);
-  };
 
-  const handlePortalReset = () => {
-    handleSelectProfile('raw');
-    addTelemetryLog('DOM_PATCH', 'Target portal reset to initial raw state.', 'blue');
-  };
-
+      <Route
+        path="/demo"
+        element={<LucentDemo />}
   const handleAuthComplete = (selectedProfile: AccessibilityProfile, email?: string) => {
     const activeEmail = email || 'Guest Demo';
     setUserEmail(activeEmail);
@@ -302,111 +223,6 @@ export default function App() {
         onSignOut={handleSignOut}
       />
 
-      {/* Main View Area */}
-      <div className="flex-1 flex overflow-hidden relative">
-        {/* Left / Full: Target Portal Webpage */}
-        <motion.div 
-          layout
-          initial={false}
-          className={`overflow-y-auto ${viewMode === 'split' ? 'w-full lg:w-3/5 border-r border-slate-800' : 'w-full'}`}
-        >
-          <TargetPortal
-            visual={visual}
-            cognitive={cognitive}
-            motor={motor}
-            onSimulateRageClick={handleTriggerRageClickSim}
-            onElementAction={(action) => addTelemetryLog('USER_TELEMETRY', `User interaction: ${action}`, 'blue')}
-            rageCount={rageCount}
-          />
-        </motion.div>
-
-        {/* Right Pane (in Split View) or Floating HUD (in Overlay View) */}
-        <AnimatePresence mode="popLayout">
-          {viewMode === 'split' ? (
-            <motion.div 
-              key="split-view"
-              initial={{ opacity: 0, x: 100 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 100 }}
-              transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-              className="hidden lg:block w-2/5 bg-slate-900 overflow-y-auto border-l border-slate-800 relative"
-            >
-              <div className="p-4">
-                <div className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider flex items-center gap-2">
-                  <span>Injected Chrome Extension Inspector Pane</span>
-                </div>
-                <ExtensionHud
-                  currentProfile={currentProfile}
-                  onSelectProfile={handleSelectProfile}
-                  visual={visual}
-                  onUpdateVisual={(up) => {
-                    setVisual(prev => ({ ...prev, ...up }));
-                    addTelemetryLog('DOM_PATCH', `Updated visual parameters`, 'blue');
-                  }}
-                  cognitive={cognitive}
-                  onUpdateCognitive={(up) => {
-                    setCognitive(prev => ({ ...prev, ...up }));
-                    addTelemetryLog('DOM_PATCH', `Updated cognitive parameters`, 'blue');
-                  }}
-                  motor={motor}
-                  onUpdateMotor={(up) => {
-                    setMotor(prev => ({ ...prev, ...up }));
-                    addTelemetryLog('DOM_PATCH', `Updated motor parameters`, 'blue');
-                  }}
-                  stats={stats}
-                  telemetryLogs={telemetryLogs}
-                  onTriggerRageClickSim={handleTriggerRageClickSim}
-                  onTriggerGeminiScanSim={handleTriggerGeminiScanSim}
-                  isScanningAi={isScanningAi}
-                />
-              </div>
-            </motion.div>
-          ) : (
-            /* Overlay Mode: Draggable Floating Extension HUD */
-            <motion.div
-              key="overlay-view"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-              className="absolute inset-0 pointer-events-none p-6 flex flex-col justify-end items-end"
-            >
-              <div className="pointer-events-auto">
-                <ExtensionHud
-                  currentProfile={currentProfile}
-                  onSelectProfile={handleSelectProfile}
-                  visual={visual}
-                  onUpdateVisual={(up) => {
-                    setVisual(prev => ({ ...prev, ...up }));
-                    addTelemetryLog('DOM_PATCH', `Updated visual parameters`, 'blue');
-                  }}
-                  cognitive={cognitive}
-                  onUpdateCognitive={(up) => {
-                    setCognitive(prev => ({ ...prev, ...up }));
-                    addTelemetryLog('DOM_PATCH', `Updated cognitive parameters`, 'blue');
-                  }}
-                  motor={motor}
-                  onUpdateMotor={(up) => {
-                    setMotor(prev => ({ ...prev, ...up }));
-                    addTelemetryLog('DOM_PATCH', `Updated motor parameters`, 'blue');
-                  }}
-                  stats={stats}
-                  telemetryLogs={telemetryLogs}
-                  onTriggerRageClickSim={handleTriggerRageClickSim}
-                  onTriggerGeminiScanSim={handleTriggerGeminiScanSim}
-                  isScanningAi={isScanningAi}
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Artifact Code & Standalone Download Modal */}
-      <ArtifactModal
-        isOpen={isArtifactModalOpen}
-        onClose={() => setIsArtifactModalOpen(false)}
-      />
-    </div>
+    </Routes>
   );
 }
