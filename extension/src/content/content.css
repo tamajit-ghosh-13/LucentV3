@@ -1,1 +1,61 @@
-/* Accessibility styles will go here */
+/* Accessibility reinforcement styles applied when the extension fixes issues */
+
+/* 1. Enhanced Focus Indicators (Cognitive/Visual Impairment) */
+html[data-accessibility-enabled="true"] *:focus {
+    outline: 3px solid #10b981 !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.4) !important;
+}
+
+/* 2. Expanded Hitboxes for Motor Impairment (Reduces precision requirement) */
+html[data-accessibility-enabled="true"] button,
+html[data-accessibility-enabled="true"] a,
+html[data-accessibility-enabled="true"] select,
+html[data-accessibility-enabled="true"] input[type="checkbox"],
+html[data-accessibility-enabled="true"] input[type="radio"],
+html[data-accessibility-enabled="true"] [role="button"],
+html[data-accessibility-enabled="true"] [role="link"] {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    display: inline-block !important;
+    cursor: pointer !important;
+}
+
+/* 3. Improved contrast for common text elements */
+html[data-accessibility-enabled="true"] p,
+html[data-accessibility-enabled="true"] span,
+html[data-accessibility-enabled="true"] div,
+html[data-accessibility-enabled="true"] h1,
+html[data-accessibility-enabled="true"] h2,
+html[data-accessibility-enabled="true"] h3,
+html[data-accessibility-enabled="true"] h4,
+html[data-accessibility-enabled="true"] h5,
+html[data-accessibility-enabled="true"] h6 {
+    text-shadow: 0px 0px 1px rgba(0,0,0,0.1) !important;
+}
+
+/* 4. Magnifying images on hover for Cognitive/Visual impairments */
+html[data-accessibility-enabled="true"] img:hover,
+html[data-accessibility-enabled="true"] svg:hover {
+    transform: scale(1.05);
+    transition: transform 0.2s ease-in-out;
+    z-index: 9999;
+    position: relative;
+}
+
+/* 5. Scanner Highlights */
+[data-accessibility-issue] {
+    position: relative;
+}
+[data-accessibility-issue]::after {
+    content: "⚠️";
+    position: absolute;
+    top: -12px;
+    right: -12px;
+    font-size: 14px;
+    background: white;
+    border-radius: 50%;
+    z-index: 10000;
+    pointer-events: none;
+    box-shadow: 0px 2px 4px rgba(0,0,0,0.2);
+}
