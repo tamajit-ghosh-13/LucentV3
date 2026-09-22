@@ -1,11 +1,266 @@
 const key = 'lucentSettings';
-const defaults = { enabled: false, cognitive: { declutter: false, dyslexia: false, readingGuide: false, calmMode: false }, motor: { targets: false, focus: false, shortcuts: false, steadyClick: true } };
-let settings;
-const master = document.querySelector('#master'); const status = document.querySelector('#status');
-function setPath(path, value) { const [group, name] = path.split('.'); settings[group][name] = value; }
-function render() { master.textContent = settings.enabled ? 'ON' : 'OFF'; master.classList.toggle('on', settings.enabled); document.querySelectorAll('[data-path]').forEach(input => { const [group,name]=input.dataset.path.split('.'); input.checked=!!settings[group][name]; input.disabled=!settings.enabled; }); }
-async function apply() { await chrome.storage.local.set({ [key]: settings }); const [tab] = await chrome.tabs.query({ active:true,currentWindow:true }); if (tab?.id) chrome.tabs.sendMessage(tab.id,{type:'LUCENT_SETTINGS',settings},()=>void chrome.runtime.lastError); chrome.runtime.sendMessage({type:'TOGGLE_EXTENSION',enabled:settings.enabled}); status.textContent=settings.enabled?'Adaptations are active on this tab.':'Lucent is paused.'; render(); }
-chrome.storage.local.get(key, stored => { settings = { ...defaults, ...(stored[key] || {}), cognitive:{...defaults.cognitive,...(stored[key]?.cognitive || {})}, motor:{...defaults.motor,...(stored[key]?.motor || {})} }; render(); });
-master.addEventListener('click',()=>{settings.enabled=!settings.enabled;apply();});
-document.querySelectorAll('[data-path]').forEach(input=>input.addEventListener('change',event=>{setPath(event.target.dataset.path,event.target.checked);apply();}));
-document.querySelector('#btn-scan').addEventListener('click',async event=>{const [tab]=await chrome.tabs.query({active:true,currentWindow:true}); chrome.tabs.sendMessage(tab.id,{type:'SCAN_ACCESSIBILITY'},response=>{event.target.textContent=response?.results?`${response.results.total} issues found`:'Scan unavailable';});});
+const defaults = {
+  enabled: false,
+  profile: 'cognitive',
+  cognitive: { declutter: false, dyslexia: false, readingGuide: false, calmMode: false, readingWidth: false },
+  motor: { targets: false, focus: false, shortcuts: false, steadyClick: true, largeCursor: false },
+  visual: { fontSize: 16, daltonize: false, highContrast: false, magnifier: false, boldText: false, crosshairs: false, textToSpeech: false, colorPatterns: false }
+};
+
+let settings = { ...defaults };
+const master = document.querySelector('#master');
+const status = document.querySelector('#status');
+
+function recordEvent(action, feature) {
+  try {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      let site = '';
+      let url = '';
+      const activeTab = tabs?.[0];
+      if (activeTab?.url && !activeTab.url.startsWith('chrome://')) {
+        try {
+          const u = new URL(activeTab.url);
+          if (u.hostname !== 'localhost' && u.hostname !== '127.0.0.1') {
+            site = u.hostname;
+            url = activeTab.url;
+          }
+        } catch (_) {}
+      }
+      if (!site) return; // Don't record dashboard/localhost or invalid tabs
+      const event = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        at: new Date().toISOString(),
+        site,
+        url,
+        action,
+        feature
+      };
+      chrome.runtime.sendMessage({ type: 'LUCENT_RECORD_EVENT', event }, () => void chrome.runtime.lastError);
+    });
+  } catch (_) {}
+}
+
+function setPath(path, value) {
+  const [group, name] = path.split('.');
+  if (!settings[group]) settings[group] = {};
+  settings[group][name] = value;
+}
+
+function render() {
+  master.textContent = settings.enabled ? 'ON' : 'OFF';
+  master.classList.toggle('on', !!settings.enabled);
+
+  document.querySelectorAll('[data-path]').forEach(input => {
+    const [group, name] = input.dataset.path.split('.');
+    input.checked = !!settings[group]?.[name];
+  });
+
+  document.querySelectorAll('[data-profile]').forEach(btn => {
+    btn.classList.toggle('active', settings.profile === btn.dataset.profile);
+  });
+
+  // Display only the active profile's feature card
+  document.querySelectorAll('[data-card-profile]').forEach(card => {
+    card.classList.toggle('active', card.dataset.cardProfile === settings.profile);
+  });
+
+  const fontSlider = document.querySelector('#popup-font-slider');
+  const fontVal = document.querySelector('#popup-font-size-val');
+  if (fontSlider && settings.visual?.fontSize) {
+    fontSlider.value = String(settings.visual.fontSize);
+    if (fontVal) fontVal.textContent = `${settings.visual.fontSize}px`;
+  }
+
+  status.textContent = settings.enabled ? 'Adaptations are active on this tab.' : 'Lucent is paused.';
+}
+
+async function apply(recordAction, recordFeature) {
+  await chrome.storage.local.set({ [key]: settings, enabled: settings.enabled });
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab?.id) {
+    chrome.tabs.sendMessage(tab.id, { type: 'LUCENT_SETTINGS', settings }, () => void chrome.runtime.lastError);
+  }
+  chrome.runtime.sendMessage({ type: 'TOGGLE_EXTENSION', enabled: settings.enabled });
+
+  if (recordAction) {
+    recordEvent(recordAction, recordFeature || 'Extension Popup');
+  }
+  render();
+}
+
+chrome.storage.local.get(key, stored => {
+  settings = {
+    ...defaults,
+    ...(stored[key] || {}),
+    cognitive: { ...defaults.cognitive, ...(stored[key]?.cognitive || {}) },
+    motor: { ...defaults.motor, ...(stored[key]?.motor || {}) },
+    visual: { ...defaults.visual, ...(stored[key]?.visual || {}) }
+  };
+  render();
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes[key]?.newValue) {
+    settings = {
+      ...defaults,
+      ...changes[key].newValue,
+      cognitive: { ...defaults.cognitive, ...(changes[key].newValue.cognitive || {}) },
+      motor: { ...defaults.motor, ...(changes[key].newValue.motor || {}) },
+      visual: { ...defaults.visual, ...(changes[key].newValue.visual || {}) }
+    };
+    render();
+  }
+});
+
+master.addEventListener('click', () => {
+  settings.enabled = !settings.enabled;
+  apply(settings.enabled ? 'Extension turned ON' : 'Extension paused', 'Master Power');
+});
+
+document.querySelectorAll('[data-path]').forEach(input => {
+  input.addEventListener('change', event => {
+    const checked = event.target.checked;
+    setPath(event.target.dataset.path, checked);
+    if (checked) {
+      settings.enabled = true; // Auto-activate master when turning on any feature
+    }
+    const row = event.target.closest('.row');
+    const label = row?.querySelector('label')?.childNodes[0]?.textContent?.trim() || event.target.dataset.path;
+    const category = event.target.dataset.path.startsWith('visual')
+      ? 'Visual & Low Vision'
+      : event.target.dataset.path.startsWith('motor')
+      ? 'Motor & Tremor'
+      : 'Cognitive & ADHD';
+    apply(`${checked ? 'Enabled' : 'Disabled'} ${label}`, category);
+  });
+});
+
+document.querySelectorAll('[data-profile]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const prof = btn.dataset.profile;
+    settings.profile = prof;
+    const profLabel = prof === 'visual' ? 'Visual & Low Vision' : prof === 'motor' ? 'Motor & Tremor' : 'Cognitive & ADHD';
+    apply(`Switched profile to ${profLabel}`, 'Profile Switcher');
+  });
+});
+
+const popupFontSlider = document.querySelector('#popup-font-slider');
+const popupFontVal = document.querySelector('#popup-font-size-val');
+
+if (popupFontSlider) {
+  popupFontSlider.addEventListener('input', async (e) => {
+    const val = Number(e.target.value);
+    if (popupFontVal) popupFontVal.textContent = `${val}px`;
+    if (!settings.visual) settings.visual = {};
+    settings.visual.fontSize = val;
+    settings.enabled = true;
+    master.textContent = 'ON';
+    master.classList.add('on');
+
+    // Instantaneous broadcast to active tab during sliding
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      chrome.tabs.sendMessage(tab.id, { type: 'LUCENT_FONT_SIZE', fontSize: val }, () => void chrome.runtime.lastError);
+    }
+  });
+
+  popupFontSlider.addEventListener('change', async (e) => {
+    const val = Number(e.target.value);
+    apply(`Scaled font size to ${val}px`, 'Visual & Low Vision');
+  });
+}
+
+let currentScanResults = null;
+
+const scanBtn = document.querySelector('#btn-scan');
+const fixBtn = document.querySelector('#btn-fix');
+const scanBox = document.querySelector('#scan-results-box');
+const aiStatus = document.querySelector('#ai-remediation-status');
+
+scanBtn?.addEventListener('click', async () => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return;
+
+  scanBtn.textContent = 'Scanning active page...';
+  chrome.tabs.sendMessage(tab.id, { type: 'SCAN_ACCESSIBILITY' }, response => {
+    const results = response?.results;
+    currentScanResults = results;
+    if (results) {
+      scanBtn.innerHTML = `<span>🔍</span> Re-scan Tab (${results.total} issues)`;
+      scanBox?.classList.add('open');
+
+      const setVal = (id, count) => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.textContent = count;
+          el.classList.toggle('zero', count === 0);
+        }
+      };
+
+      setVal('stat-unlabeled', results.unlabeledButtons ?? 0);
+      setVal('stat-alt', results.missingAlt ?? 0);
+      setVal('stat-targets', results.smallTargets ?? 0);
+      setVal('stat-contrast', results.lowContrast ?? 0);
+
+      if (aiStatus) {
+        aiStatus.textContent = results.total === 0 
+          ? 'Great job! No critical accessibility barriers found.' 
+          : `Detected ${results.total} barriers. Click below to remediate with Gemini AI.`;
+      }
+      recordEvent(`Scanned active tab: ${results.total} issues detected`, 'Visual Scanner');
+    } else {
+      scanBtn.innerHTML = '<span>🔍</span> Scan Active Tab';
+    }
+  });
+});
+
+fixBtn?.addEventListener('click', async () => {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return;
+
+  fixBtn.disabled = true;
+  fixBtn.textContent = '✨ Remediating with Gemini AI...';
+
+  chrome.tabs.sendMessage(tab.id, { type: 'GEMINI_AI_SCAN' }, response => {
+    fixBtn.disabled = false;
+    if (response?.success) {
+      fixBtn.innerHTML = '<span>✓</span> Successfully Remediated!';
+      fixBtn.style.background = '#059669';
+
+      const count = response.results?.total ?? currentScanResults?.total ?? 0;
+      const conf = Math.round((response.remediations?.confidenceScore ?? 0.95) * 100);
+
+      if (aiStatus) {
+        aiStatus.innerHTML = `<strong>Remediated ${count} barriers.</strong><br>Labels &amp; alt descriptions injected (Confidence: ${conf}%).`;
+      }
+
+      // Zero out stats
+      ['stat-unlabeled', 'stat-alt', 'stat-targets', 'stat-contrast'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.textContent = '0';
+          el.classList.add('zero');
+        }
+      });
+
+      recordEvent(`Gemini AI auto-remediated ${count} barriers on tab`, 'AI Auto-Remediate');
+    } else {
+      fixBtn.innerHTML = '<span>✨</span> Remediate with Gemini AI';
+      if (aiStatus) aiStatus.textContent = 'Remediation completed using fallback heuristics.';
+    }
+  });
+});
+
+document.querySelector('#open-dashboard')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  chrome.tabs.query({}, (tabs) => {
+    const existing = tabs.find(t => t.url && (t.url.includes('/dashboard') || t.url.includes('localhost:300')));
+    if (existing?.id) {
+      chrome.tabs.update(existing.id, { active: true });
+    } else {
+      chrome.tabs.create({ url: 'http://localhost:3001/dashboard' });
+    }
+  });
+});
+

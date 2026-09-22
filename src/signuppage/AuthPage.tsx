@@ -13,7 +13,8 @@ import {
   AlertCircle,
   ChevronDown,
   Layers,
-  Zap
+  Zap,
+  Eye
 } from 'lucide-react';
 import { AccessibilityProfile } from '../types';
 import { signUpUser, signInUser, signInWithGoogle } from '../lib/supabase';
@@ -52,6 +53,16 @@ const DISABILITY_PROFILES: {
       badgeBg: 'bg-amber-500/10 border-amber-500/30 text-amber-300',
       description: 'Expands clickable target hitboxes to >= 48px, filters accidental tremor double-clicks, and assigns direct single-key hotkeys [1-9].',
       features: ['>= 48px Target Hitbox Expansion', 'Direct [1-9] Keyboard Hotkeys', 'Tremor Double-Click Debounce', 'Sticky Target Magnetism']
+    },
+    {
+      id: 'visual',
+      label: 'Visual & Low Vision Impairment',
+      category: 'Color Blindness, Low Vision & Photophobia',
+      icon: Eye,
+      color: 'text-emerald-400',
+      badgeBg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300',
+      description: 'Applies Daltonization color-blind filters, solar high-contrast themes, hover magnification loupe, 18px minimum text, and pattern overlays.',
+      features: ['Daltonization Color Blind Filters', 'Solar High-Contrast & Contrast Boost', 'Hover Magnifier Loupe & Crosshairs', 'Color-to-Pattern Texture Overlays']
     },
     {
       id: 'raw',

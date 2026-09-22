@@ -12,3 +12,4 @@ coverage/
 # Tooling & Agent Artifacts
 .agents/
 graphify-out/
+.env.example

@@ -16,13 +16,23 @@
     "default_icon": "icons/grey.png"
   },
 
+  "icons": {
+    "16": "icons/green.png",
+    "48": "icons/green.png",
+    "128": "icons/accessibility_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.png"
+  },
+
   "background": {
     "service_worker": "src/background/serviceWorker.js"
   },
 
+  "host_permissions": [
+    "<all_urls>"
+  ],
+
   "content_scripts": [
     {
-      "matches": ["http://localhost:3000/*", "https://*/*", "http://*/*"],
+      "matches": ["<all_urls>"],
       "js": ["src/content/content.js"],
       "css": ["src/content/content.css"],
       "all_frames": true,

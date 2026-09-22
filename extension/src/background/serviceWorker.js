@@ -41,16 +41,33 @@ let eventWriteQueue = Promise.resolve();
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "TOGGLE_EXTENSION") {
         updateIcon(message.enabled);
-        chrome.storage.local.set({ enabled: message.enabled });
+        sendResponse({ success: true });
+        return true;
     }
     if (message.type === 'LUCENT_RECORD_EVENT' && message.event) {
+        const site = String(message.event.site || '').toLowerCase();
+        if (site.includes('localhost') || site.includes('127.0.0.1')) {
+            sendResponse({ ignored: true });
+            return true;
+        }
+
         eventWriteQueue = eventWriteQueue.then(async () => {
             const stored = await chrome.storage.local.get('lucentEvents');
-            const events = [message.event, ...(stored.lucentEvents || [])].slice(0, 100);
+            const cleaned = (stored.lucentEvents || []).filter((e) => {
+                const s = String(e?.site || '').toLowerCase();
+                return !s.includes('localhost') && !s.includes('127.0.0.1');
+            });
+            const events = [message.event, ...cleaned].slice(0, 100);
             await chrome.storage.local.set({ lucentEvents: events });
-            chrome.tabs.query({ url: ['http://localhost:3000/*'] }, (tabs) => tabs.forEach(tab => tab.id && chrome.tabs.sendMessage(tab.id, { type:'LUCENT_EVENT_RECORDED', event:message.event }, () => void chrome.runtime.lastError)));
+            chrome.tabs.query({}, (tabs) => {
+                tabs.forEach((tab) => {
+                    if (tab.id && (!tab.url || /^https?:/.test(tab.url))) {
+                        chrome.tabs.sendMessage(tab.id, { type: 'LUCENT_EVENT_RECORDED', event: message.event }, () => void chrome.runtime.lastError);
+                    }
+                });
+            });
         });
-        sendResponse({ queued:true });
+        sendResponse({ queued: true });
         return true;
     }
 });

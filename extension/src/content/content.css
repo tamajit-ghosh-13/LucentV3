@@ -1,18 +1,336 @@
-/* Lucent cognitive + motor overlays: all selectors require a user-enabled class. */
-html.lucent-declutter aside, html.lucent-declutter [role="banner"], html.lucent-declutter [role="complementary"], html.lucent-declutter [aria-label*="advert" i], html.lucent-declutter [class*="advert" i], html.lucent-declutter [class*="popup" i] { display: none !important; }
-html.lucent-dyslexia body { font-family: OpenDyslexic, "Comic Sans MS", Arial, sans-serif !important; letter-spacing: .045em !important; line-height: 1.75 !important; word-spacing: .12em !important; }
-html.lucent-calm *, html.lucent-calm *::before, html.lucent-calm *::after { animation-duration: .01ms !important; animation-delay:0ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; transition-delay:0ms !important; caret-color:auto !important; }
-html.lucent-calm video[autoplay], html.lucent-calm [class*="carousel" i], html.lucent-calm [class*="ticker" i] { animation-play-state:paused !important; }
-html.lucent-reading-width p, html.lucent-reading-width li, html.lucent-reading-width article { max-width: 72ch !important; }
-html.lucent-motor-targets button, html.lucent-motor-targets a, html.lucent-motor-targets input, html.lucent-motor-targets select, html.lucent-motor-targets [role="button"] { min-width: 48px !important; min-height: 48px !important; }
-html.lucent-focus *:focus-visible { outline: 4px solid #22c55e !important; outline-offset: 4px !important; box-shadow: 0 0 0 7px rgba(34,197,94,.28) !important; }
-html.lucent-large-cursor, html.lucent-large-cursor * { cursor: none !important; }
-.lucent-large-cursor-dot { position:fixed; z-index:2147483646; width:28px; height:28px; border:3px solid #22c55e; border-radius:50%; background:rgba(255,255,255,.18); box-shadow:0 0 0 3px rgba(0,0,0,.55); pointer-events:none; left:0; top:0; }
-[data-lucent-shortcut] { position: relative !important; }
-[data-lucent-shortcut]::after { content: attr(data-lucent-shortcut); position: absolute; z-index: 2147483647; top: -9px; left: -9px; width: 20px; height: 20px; display:grid; place-items:center; border-radius:999px; background:#111827; color:#fff; border:2px solid #86efac; font:700 12px/1 system-ui; pointer-events:none; }
-.lucent-reading-guide { position:fixed; inset:0; z-index:2147483646; height:68px; background:rgba(251,191,36,.12); border-top:2px solid rgba(251,191,36,.7); border-bottom:2px solid rgba(251,191,36,.7); pointer-events:none; transition:transform .06s ease-out; }
-[data-accessibility-issue] { position:relative; }
-[data-accessibility-issue]::after { content:'⚠️'; position:absolute; top:-12px; right:-12px; z-index:2147483647; pointer-events:none; }
+#lucent-widget {
+  all: initial !important;
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  display: block !important;
+}
+#lucent-widget:not(.lucent-dragged) {
+  right: 20px !important;
+  bottom: 20px !important;
+}
+#lucent-widget.lucent-dragged {
+  right: auto !important;
+  bottom: auto !important;
+}
 
-/* Persistent bottom-right control: isolated class names avoid host-site collisions. */
-#lucent-widget{position:fixed;right:20px;bottom:20px;z-index:2147483647;font-family:system-ui,-apple-system,sans-serif;color:#ecfff3;line-height:1.25;text-align:left}#lucent-widget *{box-sizing:border-box}#lucent-widget .lucent-fab{border:1px solid #5b6b62;background:#38463d;color:#f1fff5;border-radius:999px;padding:11px 15px;display:flex;align-items:center;gap:8px;font:700 14px system-ui;box-shadow:0 12px 30px rgba(0,0,0,.3);cursor:pointer}#lucent-widget.is-on .lucent-fab{background:#22c55e;border-color:#86efac;color:#073618;box-shadow:0 0 0 4px rgba(34,197,94,.22),0 12px 30px rgba(0,0,0,.3)}#lucent-widget .lucent-menu{position:absolute;right:0;bottom:55px;width:270px;padding:14px;background:#0c1b12;border:1px solid #42664e;border-radius:15px;box-shadow:0 18px 45px rgba(0,0,0,.45)}#lucent-widget .lucent-menu[hidden]{display:none}#lucent-widget .lucent-menu-header{display:flex;align-items:center;justify-content:space-between;font-size:14px}#lucent-widget .lucent-hint{color:#accab6;font-size:12px;margin:6px 0 10px}#lucent-widget .lucent-master{border:0;border-radius:999px;background:#46554c;color:#fff;padding:6px 10px;font-weight:800;cursor:pointer}#lucent-widget .lucent-master.is-on{background:#22c55e;color:#073618}#lucent-widget .lucent-options{border-top:1px solid #294334;padding-top:5px}#lucent-widget .lucent-options label{display:flex;justify-content:space-between;align-items:center;padding:8px 1px;color:#e5f5e9;font-size:13px;cursor:pointer}#lucent-widget input{accent-color:#22c55e;width:16px;height:16px}
+/* Lucent cognitive + motor overlays: all selectors require a user-enabled class. */
+html.lucent-declutter aside,
+html.lucent-declutter [role="banner"],
+html.lucent-declutter [role="complementary"],
+html.lucent-declutter [aria-label*="advert" i],
+html.lucent-declutter [class*="advert" i],
+html.lucent-declutter [id*="advert" i],
+html.lucent-declutter [class*="sponsor" i],
+html.lucent-declutter [id*="sponsor" i],
+html.lucent-declutter [class*="cookie" i],
+html.lucent-declutter [id*="cookie" i],
+html.lucent-declutter [class*="popup" i]:not(#lucent-widget):not(#lucent-widget *),
+html.lucent-declutter [class*="newsletter" i] {
+  display: none !important;
+}
+
+html.lucent-dyslexia,
+html.lucent-dyslexia body,
+html.lucent-dyslexia p,
+html.lucent-dyslexia span,
+html.lucent-dyslexia a,
+html.lucent-dyslexia li,
+html.lucent-dyslexia h1,
+html.lucent-dyslexia h2,
+html.lucent-dyslexia h3,
+html.lucent-dyslexia h4,
+html.lucent-dyslexia h5,
+html.lucent-dyslexia h6,
+html.lucent-dyslexia div {
+  font-family: OpenDyslexic, "Comic Sans MS", "Segoe UI", Arial, sans-serif !important;
+  letter-spacing: .045em !important;
+  line-height: 1.75 !important;
+  word-spacing: .12em !important;
+}
+
+html.lucent-calm *,
+html.lucent-calm *::before,
+html.lucent-calm *::after {
+  animation-duration: .01ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: .01ms !important;
+  transition-delay: 0ms !important;
+  caret-color: auto !important;
+}
+html.lucent-calm video[autoplay],
+html.lucent-calm [class*="carousel" i],
+html.lucent-calm [class*="ticker" i] {
+  animation-play-state: paused !important;
+}
+
+html.lucent-reading-width p,
+html.lucent-reading-width li,
+html.lucent-reading-width article {
+  max-width: 70ch !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+html.lucent-motor-targets button:not(#lucent-widget *),
+html.lucent-motor-targets a:not(#lucent-widget *),
+html.lucent-motor-targets input:not(#lucent-widget *),
+html.lucent-motor-targets select:not(#lucent-widget *),
+html.lucent-motor-targets [role="button"]:not(#lucent-widget *) {
+  min-width: 48px !important;
+  min-height: 48px !important;
+  padding: 6px 10px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+html.lucent-focus *:focus,
+html.lucent-focus *:focus-visible {
+  outline: 4px solid #22c55e !important;
+  outline-offset: 4px !important;
+  box-shadow: 0 0 0 7px rgba(34, 197, 94, .35) !important;
+}
+
+html.lucent-large-cursor,
+html.lucent-large-cursor * {
+  cursor: default !important;
+}
+
+.lucent-large-cursor-dot {
+  position: fixed !important;
+  z-index: 2147483646 !important;
+  width: 32px !important;
+  height: 32px !important;
+  border: 3px solid #22c55e !important;
+  border-radius: 50% !important;
+  background: rgba(34, 197, 94, .25) !important;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, .7) !important;
+  pointer-events: none !important;
+  left: 0 !important;
+  top: 0 !important;
+  transform: translate(-100px, -100px);
+  will-change: transform !important;
+}
+
+[data-lucent-shortcut] {
+  position: relative !important;
+}
+[data-lucent-shortcut]::after {
+  content: attr(data-lucent-shortcut);
+  position: absolute;
+  z-index: 2147483647;
+  top: -9px;
+  left: -9px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #111827;
+  color: #fff;
+  border: 2px solid #86efac;
+  font: 700 12px/1 system-ui;
+  pointer-events: none;
+}
+
+.lucent-reading-guide {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483645 !important;
+  height: 70px !important;
+  background: rgba(251, 191, 36, .15) !important;
+  border-top: 3px solid rgba(251, 191, 36, .85) !important;
+  border-bottom: 3px solid rgba(251, 191, 36, .85) !important;
+  box-shadow: 0 0 25px rgba(251, 191, 36, .25) !important;
+  pointer-events: none !important;
+  will-change: transform !important;
+  transition: transform .04s ease-out !important;
+}
+
+[data-accessibility-issue] {
+  position: relative;
+}
+[data-accessibility-issue]::after {
+  content: '⚠️';
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  z-index: 2147483647;
+  pointer-events: none;
+}
+
+/* =====================================================
+   VISUAL IMPAIRMENT & LOW VISION STYLES
+   ===================================================== */
+
+/* Solar Yellow-on-Black High Contrast */
+html.lucent-high-contrast,
+html.lucent-high-contrast body {
+  background-color: #000000 !important;
+  color: #ffff00 !important;
+}
+
+html.lucent-high-contrast *:not(#lucent-widget):not(#lucent-widget *):not(svg):not(path):not(img):not(video) {
+  background-color: #000000 !important;
+  color: #ffff00 !important;
+  border-color: #555500 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+html.lucent-high-contrast a:not(#lucent-widget *),
+html.lucent-high-contrast a *:not(#lucent-widget *) {
+  color: #38bdf8 !important;
+  text-decoration: underline !important;
+}
+
+html.lucent-high-contrast button:not(#lucent-widget *),
+html.lucent-high-contrast input:not(#lucent-widget *),
+html.lucent-high-contrast select:not(#lucent-widget *),
+html.lucent-high-contrast textarea:not(#lucent-widget *) {
+  background-color: #121212 !important;
+  color: #ffff00 !important;
+  border: 2px solid #ffff00 !important;
+}
+
+html.lucent-high-contrast img,
+html.lucent-high-contrast video {
+  filter: brightness(0.9) contrast(1.15) !important;
+}
+
+/* Real-time Typography Scaling Controller */
+.widget-font-size-control {
+  background: #112217 !important;
+  border: 1px solid #20442c !important;
+  border-radius: 8px !important;
+  padding: 8px 10px !important;
+  margin-bottom: 8px !important;
+}
+
+/* Bold Typography & Minimum Size Floor */
+html.lucent-bold-text body,
+html.lucent-bold-text p,
+html.lucent-bold-text span,
+html.lucent-bold-text a,
+html.lucent-bold-text li,
+html.lucent-bold-text label,
+html.lucent-bold-text button,
+html.lucent-bold-text div {
+  font-weight: 600 !important;
+  font-size: max(1.05rem, 18px) !important;
+  line-height: 1.65 !important;
+  letter-spacing: 0.02em !important;
+}
+
+/* Cursor Crosshairs Guide */
+.lucent-crosshair-h {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 2px !important;
+  background: rgba(251, 191, 36, 0.75) !important;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.5) !important;
+  pointer-events: none !important;
+  z-index: 2147483644 !important;
+  top: 0 !important;
+  transform: translateY(-100px);
+  will-change: transform !important;
+}
+
+.lucent-crosshair-v {
+  position: fixed !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  width: 2px !important;
+  background: rgba(251, 191, 36, 0.75) !important;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.5) !important;
+  pointer-events: none !important;
+  z-index: 2147483644 !important;
+  left: 0 !important;
+  transform: translateX(-100px);
+  will-change: transform !important;
+}
+
+/* Hover Magnifier Loupe */
+.lucent-magnifier-loupe {
+  position: fixed !important;
+  width: 170px !important;
+  height: 170px !important;
+  border-radius: 50% !important;
+  border: 3px solid #fbbf24 !important;
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.8), 0 15px 35px rgba(0, 0, 0, 0.6) !important;
+  pointer-events: none !important;
+  z-index: 2147483645 !important;
+  overflow: hidden !important;
+  left: 0 !important;
+  top: 0 !important;
+  transform: translate(-300px, -300px);
+  background: #000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #fff !important;
+  font: 700 16px/1.3 system-ui !important;
+  padding: 14px !important;
+  text-align: center !important;
+}
+
+/* Text-to-Speech Active Sentence Highlight */
+.lucent-speech-active {
+  background-color: rgba(250, 204, 21, 0.45) !important;
+  outline: 3px solid #eab308 !important;
+  outline-offset: 2px !important;
+  border-radius: 4px !important;
+}
+
+/* Color-to-Pattern Status Icons */
+.lucent-status-badge-augmented {
+  position: relative !important;
+}
+.lucent-status-badge-augmented::before {
+  content: attr(data-lucent-badge) ' ';
+  font-weight: 800 !important;
+  margin-right: 4px !important;
+}
+
+/* Gemini AI Auto-Remediation Hitbox & Feedback */
+.lucent-touch-remediated {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.lucent-ai-toast {
+  position: fixed !important;
+  bottom: 24px !important;
+  left: 50% !important;
+  transform: translateX(-50%) translateY(100px) !important;
+  background: #0f291e !important;
+  color: #ecfff3 !important;
+  border: 1px solid #22c55e !important;
+  border-radius: 999px !important;
+  padding: 10px 22px !important;
+  font: 600 13px system-ui, -apple-system, sans-serif !important;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.6) !important;
+  z-index: 2147483647 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.lucent-ai-toast.show {
+  transform: translateX(-50%) translateY(0) !important;
+  opacity: 1 !important;
+}
+.lucent-ai-toast-icon {
+  font-size: 16px !important;
+  color: #4ade80 !important;
+}
+

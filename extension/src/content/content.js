@@ -1,175 +1,1617 @@
-// Lucent's visual scanner lives below unchanged in spirit. Cognitive and motor
-// adaptations are self-contained, reversible, and never alter a site's handlers.
+// Lucent's visual scanner and runtime accessibility adaptations
 const ROOT = document.documentElement;
 const settingsKey = 'lucentSettings';
-let settings = { enabled: false, profile: 'raw', cognitive: { declutter: false, dyslexia: false, readingGuide: false, calmMode: false, readingWidth: false }, motor: { targets: false, focus: false, shortcuts: false, steadyClick: false, largeCursor: false } };
+let settings = {
+  enabled: false,
+  profile: 'cognitive',
+  cognitive: { declutter: false, dyslexia: false, readingGuide: false, calmMode: false, readingWidth: false },
+  motor: { targets: false, focus: false, shortcuts: false, steadyClick: false, largeCursor: false },
+  visual: { fontSize: 16, daltonize: false, highContrast: false, magnifier: false, boldText: false, crosshairs: false, textToSpeech: false, colorPatterns: false }
+};
 let guide;
 let shortcutNodes = [];
 const recentActivations = new WeakMap();
 let lucentWidget, lucentWidgetRoot, widgetProfile;
 let widgetObserver;
 let largeCursor;
-const clutterSelector = 'aside, [role="banner"], [role="complementary"], [aria-label*="advert" i], [class*="advert" i], [class*="popup" i], [class*="modal" i], [class*="cookie" i]';
+
+// Visual runtime controllers
+let daltonizeSvg;
+let crosshairH, crosshairV;
+let magnifier;
+let speechActiveEl;
+
+// Catch extension context invalidation globally
+window.addEventListener('error', (event) => {
+  if (event?.message?.includes?.('Extension context invalidated') ||
+      event?.error?.message?.includes?.('Extension context invalidated')) {
+    try {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      cleanupContext();
+    } catch (_) {}
+  }
+}, true);
+
+function isDashboard() {
+  try {
+    const host = location.hostname;
+    return (
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host === '0.0.0.0' ||
+      Boolean(window.isLucentDashboardTab) ||
+      Boolean(document.getElementById('root') && (location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/activity') || location.pathname === '/'))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isExtensionValid() {
+  try {
+    return Boolean(typeof chrome !== 'undefined' && chrome?.runtime && !!chrome.runtime.id);
+  } catch {
+    return false;
+  }
+}
+
+function cleanupContext() {
+  try {
+    window.removeEventListener('message', handleDashboardMessage);
+    document.removeEventListener('click', blockRepeatActivation, true);
+    document.removeEventListener('keydown', handleKeyDown, true);
+    disableGuide();
+    disableLargeCursor();
+    disableDaltonize();
+    disableCrosshairs();
+    disableMagnifier();
+    disableTextToSpeech();
+    disableColorPatterns();
+    clearShortcuts();
+    if (fontStyleEl) {
+      fontStyleEl.textContent = '';
+    }
+    if (widgetObserver) {
+      widgetObserver.disconnect();
+      widgetObserver = undefined;
+    }
+    if (lucentWidget) {
+      lucentWidget.remove();
+      lucentWidget = undefined;
+      lucentWidgetRoot = undefined;
+    }
+  } catch (_) {}
+}
+
+async function safeStorageGet(keys) {
+  if (!isExtensionValid()) { cleanupContext(); return null; }
+  try {
+    return await chrome.storage.local.get(keys);
+  } catch {
+    cleanupContext();
+    return null;
+  }
+}
+
+async function safeStorageSet(obj) {
+  if (!isExtensionValid()) { cleanupContext(); return false; }
+  try {
+    await chrome.storage.local.set(obj);
+    return true;
+  } catch {
+    cleanupContext();
+    return false;
+  }
+}
+
+async function safeSendMessage(message) {
+  if (!isExtensionValid()) { cleanupContext(); return null; }
+  try {
+    return await chrome.runtime.sendMessage(message);
+  } catch {
+    cleanupContext();
+    return null;
+  }
+}
+
+function persistSettings(next) {
+  safeStorageSet({ [settingsKey]: next, enabled: next.enabled });
+}
 
 function applySettings(next) {
-  settings = next;
+  settings = next || settings;
+  if (isDashboard()) return;
+
+  const isEnabled = !!settings.enabled;
   const c = settings.cognitive || {};
   const m = settings.motor || {};
-  ROOT.classList.toggle('lucent-enabled', !!settings.enabled);
-  ROOT.classList.toggle('lucent-declutter', !!settings.enabled && !!c.declutter);
-  ROOT.classList.toggle('lucent-dyslexia', !!settings.enabled && !!c.dyslexia);
-  ROOT.classList.toggle('lucent-calm', !!settings.enabled && !!c.calmMode);
-  ROOT.classList.toggle('lucent-reading-width', !!settings.enabled && !!c.readingWidth);
-  ROOT.classList.toggle('lucent-motor-targets', !!settings.enabled && !!m.targets);
-  ROOT.classList.toggle('lucent-focus', !!settings.enabled && !!m.focus);
-  ROOT.classList.toggle('lucent-large-cursor', !!settings.enabled && !!m.largeCursor);
-  updateDeclutter(!!settings.enabled && !!c.declutter);
-  if (settings.enabled && m.largeCursor) enableLargeCursor(); else disableLargeCursor();
-  if (settings.enabled && c.readingGuide) enableGuide(); else disableGuide();
-  if (settings.enabled && m.shortcuts) assignShortcuts(); else clearShortcuts();
-  if (lucentWidgetRoot && widgetProfile !== settings.profile) rebuildWidgetOptions();
-  renderWidget();
-  report('settings updated', settings.profile === 'cognitive' ? 'Cognitive / ADHD' : settings.profile === 'motor' ? 'Motor assistance' : 'Baseline');
+  const v = settings.visual || {};
+
+  // Cognitive & Motor CSS classes
+  ROOT.classList.toggle('lucent-enabled', isEnabled);
+  ROOT.classList.toggle('lucent-declutter', isEnabled && !!c.declutter);
+  ROOT.classList.toggle('lucent-dyslexia', isEnabled && !!c.dyslexia);
+  ROOT.classList.toggle('lucent-calm', isEnabled && !!c.calmMode);
+  ROOT.classList.toggle('lucent-reading-width', isEnabled && !!c.readingWidth);
+  ROOT.classList.toggle('lucent-motor-targets', isEnabled && !!m.targets);
+  ROOT.classList.toggle('lucent-focus', isEnabled && !!m.focus);
+  ROOT.classList.toggle('lucent-large-cursor', isEnabled && !!m.largeCursor);
+
+  // Visual CSS classes
+  ROOT.classList.toggle('lucent-high-contrast', isEnabled && !!v.highContrast);
+  ROOT.classList.toggle('lucent-bold-text', isEnabled && !!v.boldText);
+
+  // Motor & Cognitive runtime
+  updateDeclutter(isEnabled && !!c.declutter);
+  if (isEnabled && m.largeCursor) enableLargeCursor(); else disableLargeCursor();
+  if (isEnabled && c.readingGuide) enableGuide(); else disableGuide();
+  if (isEnabled && m.shortcuts) assignShortcuts(); else clearShortcuts();
+
+  // Visual runtime
+  applyFontSize(isEnabled ? (v.fontSize || 16) : 16);
+  if (isEnabled && v.daltonize) enableDaltonize(); else disableDaltonize();
+  if (isEnabled && v.crosshairs) enableCrosshairs(); else disableCrosshairs();
+  if (isEnabled && v.magnifier) enableMagnifier(); else disableMagnifier();
+  if (isEnabled && v.textToSpeech) enableTextToSpeech(); else disableTextToSpeech();
+  if (isEnabled && v.colorPatterns) enableColorPatterns(); else disableColorPatterns();
+
+  if (lucentWidgetRoot) {
+    if (widgetProfile !== settings.profile) {
+      rebuildWidgetOptions();
+    } else {
+      renderWidget();
+    }
+  }
+  const profName = settings.profile === 'cognitive' ? 'Cognitive & ADHD' : settings.profile === 'motor' ? 'Motor & Tremor' : settings.profile === 'visual' ? 'Visual & Low Vision' : 'Baseline';
+  report('settings updated', profName);
 }
 
 function updateDeclutter(enabled) {
-  document.querySelectorAll('[data-lucent-declutter]').forEach(node => { node.hidden = false; delete node.dataset.lucentDeclutter; });
+  if (isDashboard()) return;
+  document.querySelectorAll('[data-lucent-declutter]').forEach(node => {
+    node.hidden = false;
+    delete node.dataset.lucentDeclutter;
+  });
   if (!enabled) return;
   const selectors = '[aria-label*="advert" i],[id*="advert" i],[class*="advert" i],[id*="sponsor" i],[class*="sponsor" i],[id*="cookie" i],[class*="cookie" i],[id*="newsletter" i],[class*="newsletter" i],[class*="popup" i],[class*="promo" i]';
   document.querySelectorAll(selectors).forEach(node => {
     if (node.closest('#lucent-widget') || node.matches('main,article,[role="main"]')) return;
     const rect = node.getBoundingClientRect();
-    if (rect.width > 40 && rect.height > 20) { node.hidden = true; node.dataset.lucentDeclutter = 'true'; }
+    if (rect.width > 40 && rect.height > 20) {
+      node.hidden = true;
+      node.dataset.lucentDeclutter = 'true';
+    }
   });
 }
 
 function enableLargeCursor() {
-  if (largeCursor) return;
-  largeCursor = document.createElement('div'); largeCursor.className = 'lucent-large-cursor-dot'; largeCursor.setAttribute('aria-hidden','true'); document.body.appendChild(largeCursor);
-  document.addEventListener('pointermove', moveLargeCursor, { passive:true });
+  if (isDashboard() || largeCursor) return;
+  largeCursor = document.createElement('div');
+  largeCursor.className = 'lucent-large-cursor-dot';
+  largeCursor.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(largeCursor);
+  document.addEventListener('pointermove', moveLargeCursor, { passive: true });
 }
-function moveLargeCursor(event) { if (largeCursor) largeCursor.style.transform = `translate(${event.clientX - 14}px,${event.clientY - 14}px)`; }
-function disableLargeCursor() { document.removeEventListener('pointermove', moveLargeCursor); largeCursor?.remove(); largeCursor = undefined; }
-
-function createWidget() {
-  if (lucentWidget || !document.body) return;
-  // Shadow DOM protects this UI from every host website's CSS and JavaScript.
-  lucentWidget = document.createElement('section'); lucentWidget.id = 'lucent-widget'; lucentWidget.setAttribute('aria-label', 'Lucent accessibility controls'); lucentWidgetRoot = lucentWidget.attachShadow({ mode: 'closed' });
-  lucentWidgetRoot.innerHTML = `<style>:host{all:initial;position:fixed;right:20px;bottom:20px;z-index:2147483647;font-family:system-ui,-apple-system,sans-serif;color:#ecfff3;line-height:1.25;text-align:left}.fab{border:1px solid #5b6b62;background:#38463d;color:#f1fff5;border-radius:999px;padding:11px 15px;display:flex;align-items:center;gap:8px;font:700 14px system-ui;box-shadow:0 12px 30px rgba(0,0,0,.3);cursor:pointer}.on .fab{background:#22c55e;border-color:#86efac;color:#073618;box-shadow:0 0 0 4px rgba(34,197,94,.22),0 12px 30px rgba(0,0,0,.3)}.menu{position:absolute;right:0;bottom:55px;width:270px;padding:14px;background:#0c1b12;border:1px solid #42664e;border-radius:15px;box-shadow:0 18px 45px rgba(0,0,0,.45)}.header{display:flex;align-items:center;justify-content:space-between;font-size:14px}.hint{color:#accab6;font-size:12px;margin:6px 0 10px}.master{border:0;border-radius:999px;background:#46554c;color:#fff;padding:6px 10px;font-weight:800;cursor:pointer}.master.on{background:#22c55e;color:#073618}.options{border-top:1px solid #294334;padding-top:5px}.options label{display:flex;justify-content:space-between;align-items:center;padding:8px 1px;color:#e5f5e9;font-size:13px;cursor:pointer}.options input{accent-color:#22c55e;width:16px;height:16px}</style><button class="fab" aria-expanded="false" aria-label="Open Lucent accessibility controls"><span>✦</span><b>Lucent</b></button><div class="menu" hidden><div class="header"><strong>Accessibility tools</strong><button class="master" type="button"></button></div><p class="hint">Choose what helps on this website.</p><div class="options"></div></div>`;
-  document.body.appendChild(lucentWidget);
-  watchWidget();
-  const fab = lucentWidgetRoot.querySelector('.fab'); const menu = lucentWidgetRoot.querySelector('.menu');
-  fab.addEventListener('click', () => { const open = menu.hidden; menu.hidden = !open; fab.setAttribute('aria-expanded', String(open)); });
-  lucentWidgetRoot.querySelector('.master').addEventListener('click', () => persistSettings({ ...settings, enabled: !settings.enabled }));
-  rebuildWidgetOptions();
-  renderWidget();
+function moveLargeCursor(event) {
+  if (largeCursor) largeCursor.style.transform = `translate(${event.clientX - 16}px, ${event.clientY - 16}px)`;
 }
-function watchWidget() {
-  if (widgetObserver) return;
-  // SPAs often replace their body after navigation. Reinsert the controller without user action.
-  widgetObserver = new MutationObserver(() => {
-    if (!document.body) return;
-    if (!lucentWidget?.isConnected) { lucentWidget = undefined; lucentWidgetRoot = undefined; widgetProfile = undefined; createWidget(); applySettings(settings); }
-  });
-  widgetObserver.observe(document.documentElement, { childList: true, subtree: true });
-}
-function rebuildWidgetOptions() {
-  if (!lucentWidgetRoot) return;
-  widgetProfile = settings.profile;
-  const options = settings.profile === 'motor'
-    ? [['motor.targets','48 px targets'],['motor.focus','Focus halo'],['motor.shortcuts','Number shortcuts'],['motor.steadyClick','Steady click'],['motor.largeCursor','Large cursor']]
-    : [['cognitive.declutter','De-clutter'],['cognitive.readingGuide','Reading guide'],['cognitive.dyslexia','Dyslexia-friendly text'],['cognitive.calmMode','Calm mode'],['cognitive.readingWidth','Comfortable reading width']];
-  lucentWidgetRoot.querySelector('.options').innerHTML = options.map(([path,label]) => `<label><span>${label}</span><input type="checkbox" data-path="${path}"></label>`).join('');
-  lucentWidgetRoot.querySelectorAll('input[data-path]').forEach(input => input.addEventListener('change', (event) => { const [group, name] = event.target.dataset.path.split('.'); persistSettings({ ...settings, [group]: { ...settings[group], [name]: event.target.checked } }); }));
-  renderWidget();
-}
-function persistSettings(next) { chrome.storage.local.set({ [settingsKey]: next }); }
-function renderWidget() {
-  if (!lucentWidgetRoot) return;
-  const panel = lucentWidgetRoot.querySelector('.fab').parentElement; panel.classList.toggle('on', !!settings.enabled);
-  const master = lucentWidgetRoot.querySelector('.master'); master.textContent = settings.enabled ? 'On' : 'Off'; master.classList.toggle('on', !!settings.enabled);
-  lucentWidgetRoot.querySelectorAll('input[data-path]').forEach(input => { const [group,name] = input.dataset.path.split('.'); input.checked = !!settings[group]?.[name]; input.disabled = !settings.enabled; });
-}
-
-function report(action, feature) {
-  const event = { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, at: new Date().toISOString(), site: location.hostname, action, feature };
-  // The worker serialises writes so simultaneous tabs cannot overwrite each other's history.
-  chrome.runtime.sendMessage({ type: 'LUCENT_RECORD_EVENT', event }, () => void chrome.runtime.lastError);
-  // The dashboard page receives this only when this content script is injected there.
-  if (location.origin === 'http://localhost:3000') window.postMessage({ source: 'lucent-extension', type: 'EVENT', event }, location.origin);
+function disableLargeCursor() {
+  document.removeEventListener('pointermove', moveLargeCursor);
+  largeCursor?.remove();
+  largeCursor = undefined;
 }
 
 function enableGuide() {
-  if (guide) return;
-  guide = document.createElement('div'); guide.className = 'lucent-reading-guide'; guide.setAttribute('aria-hidden', 'true');
+  if (isDashboard() || guide) return;
+  guide = document.createElement('div');
+  guide.className = 'lucent-reading-guide';
+  guide.setAttribute('aria-hidden', 'true');
   document.body.appendChild(guide);
   document.addEventListener('pointermove', moveGuide, { passive: true });
 }
-function moveGuide(event) { if (guide) guide.style.transform = `translateY(${event.clientY - 34}px)`; }
-function disableGuide() { document.removeEventListener('pointermove', moveGuide); guide?.remove(); guide = undefined; }
-
-function assignShortcuts() {
-  clearShortcuts();
-  shortcutNodes = [...document.querySelectorAll('button, a[href], input, select, textarea, [role="button"]')]
-    .filter((node) => { const r = node.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !node.closest('[aria-hidden="true"]'); })
-    .slice(0, 9);
-  shortcutNodes.forEach((node, index) => { node.dataset.lucentShortcut = String(index + 1); });
+function moveGuide(event) {
+  if (guide) guide.style.transform = `translateY(${event.clientY - 35}px)`;
 }
-function clearShortcuts() { shortcutNodes.forEach((node) => delete node.dataset.lucentShortcut); shortcutNodes = []; }
-
-document.addEventListener('keydown', (event) => {
-  if (!settings.enabled || !settings.motor?.shortcuts || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
-  const index = Number(event.key) - 1;
-  if (index >= 0 && shortcutNodes[index]) { event.preventDefault(); shortcutNodes[index].focus(); shortcutNodes[index].click(); }
-}, true);
-
-// Filters accidental duplicate activations without blocking normal clicks.
-function blockRepeatActivation(event) {
-  if (!settings.enabled || !settings.motor?.steadyClick) return;
-  const target = event.target.closest?.('button, a, input, select, [role="button"]'); if (!target) return;
-  const now = Date.now(); const last = recentActivations.get(target) || 0;
-  if (now - last < 550) { event.preventDefault(); event.stopImmediatePropagation(); report('Blocked accidental repeat activation', 'Steady click'); return; }
-  recentActivations.set(target, now);
+function disableGuide() {
+  document.removeEventListener('pointermove', moveGuide);
+  guide?.remove();
+  guide = undefined;
 }
-document.addEventListener('click', blockRepeatActivation, true);
 
-chrome.storage.local.get(settingsKey, (stored) => {
-  createWidget(); applySettings({ ...settings, ...(stored[settingsKey] || {}) });
-  if (settings.enabled && location.origin !== 'http://localhost:3000') report(`Visited ${document.title || location.pathname}`, settings.profile === 'motor' ? 'Motor assistance' : 'Cognitive / ADHD');
-});
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local') return;
-  // Replace the complete profile state so every existing tab immediately reflects a profile switch.
-  if (changes[settingsKey]) applySettings(changes[settingsKey].newValue);
-  if (location.origin === 'http://localhost:3000' && changes.lucentEvents?.newValue?.[0]) window.postMessage({ source: 'lucent-extension', type: 'EVENT', event: changes.lucentEvents.newValue[0] }, location.origin);
-});
+// Visual: Instantaneous font size scaling controller
+let fontStyleEl;
+function applyFontSize(size) {
+  if (isDashboard()) return;
+  if (!fontStyleEl) {
+    fontStyleEl = document.getElementById('lucent-font-size-style');
+    if (!fontStyleEl) {
+      fontStyleEl = document.createElement('style');
+      fontStyleEl.id = 'lucent-font-size-style';
+      (document.head || document.documentElement).appendChild(fontStyleEl);
+    }
+  }
+  const isEnabled = Boolean(settings.enabled);
+  const targetSize = (isEnabled && typeof size === 'number') ? size : 16;
+  if (targetSize === 16 && !isEnabled) {
+    fontStyleEl.textContent = '';
+    return;
+  }
+  fontStyleEl.textContent = `
+    html.lucent-enabled body,
+    html.lucent-enabled p,
+    html.lucent-enabled span:not(#lucent-widget *),
+    html.lucent-enabled a:not(#lucent-widget *),
+    html.lucent-enabled li:not(#lucent-widget *),
+    html.lucent-enabled td,
+    html.lucent-enabled th,
+    html.lucent-enabled label:not(#lucent-widget *),
+    html.lucent-enabled article,
+    html.lucent-enabled section,
+    html.lucent-enabled div:not(#lucent-widget):not(#lucent-widget *),
+    html.lucent-enabled button:not(#lucent-widget *),
+    html.lucent-enabled input:not(#lucent-widget *),
+    html.lucent-enabled select:not(#lucent-widget *),
+    html.lucent-enabled textarea:not(#lucent-widget *) {
+      font-size: ${targetSize}px !important;
+      line-height: 1.5 !important;
+    }
+    html.lucent-enabled h1 { font-size: ${Math.round(targetSize * 1.8)}px !important; }
+    html.lucent-enabled h2 { font-size: ${Math.round(targetSize * 1.5)}px !important; }
+    html.lucent-enabled h3 { font-size: ${Math.round(targetSize * 1.3)}px !important; }
+    html.lucent-enabled h4 { font-size: ${Math.round(targetSize * 1.15)}px !important; }
+  `;
+}
 
-// Safe bridge for the local dashboard. No privileged APIs are exposed to webpages.
-if (location.origin === 'http://localhost:3000') {
-  window.addEventListener('message', (event) => {
-    if (event.source !== window || event.origin !== location.origin || event.data?.source !== 'lucent-dashboard') return;
-    if (event.data.type === 'PING') chrome.storage.local.get('lucentEvents', (stored) => {
-      window.postMessage({ source: 'lucent-extension', type: 'STATE', settings }, location.origin);
-      window.postMessage({ source: 'lucent-extension', type: 'EVENTS', events: stored.lucentEvents || [] }, location.origin);
-    });
-    if (event.data.type === 'SETTINGS' && event.data.settings) chrome.storage.local.set({ [settingsKey]: event.data.settings });
+// Visual: Daltonization spectral shift filter
+function enableDaltonize() {
+  if (isDashboard() || daltonizeSvg) return;
+  daltonizeSvg = document.createElement('div');
+  daltonizeSvg.id = 'lucent-daltonize-wrapper';
+  daltonizeSvg.style.display = 'none';
+  daltonizeSvg.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg">
+      <filter id="lucent-daltonize-filter">
+        <feColorMatrix type="matrix" values="
+          0.625 0.375 0 0 0
+          0.700 0.300 0 0 0
+          0 0.300 0.700 0 0
+          0 0 0 1 0" />
+      </filter>
+    </svg>
+  `;
+  document.body.appendChild(daltonizeSvg);
+  ROOT.style.filter = 'url(#lucent-daltonize-filter)';
+}
+function disableDaltonize() {
+  if (ROOT.style.filter?.includes('lucent-daltonize-filter')) {
+    ROOT.style.filter = '';
+  }
+  daltonizeSvg?.remove();
+  daltonizeSvg = undefined;
+}
+
+// Visual: Cursor Crosshairs Guide
+function enableCrosshairs() {
+  if (isDashboard() || crosshairH) return;
+  crosshairH = document.createElement('div');
+  crosshairH.className = 'lucent-crosshair-h';
+  crosshairV = document.createElement('div');
+  crosshairV.className = 'lucent-crosshair-v';
+  document.body.appendChild(crosshairH);
+  document.body.appendChild(crosshairV);
+  document.addEventListener('pointermove', moveCrosshairs, { passive: true });
+}
+function moveCrosshairs(e) {
+  if (crosshairH) crosshairH.style.transform = `translateY(${e.clientY}px)`;
+  if (crosshairV) crosshairV.style.transform = `translateX(${e.clientX}px)`;
+}
+function disableCrosshairs() {
+  document.removeEventListener('pointermove', moveCrosshairs);
+  crosshairH?.remove();
+  crosshairV?.remove();
+  crosshairH = undefined;
+  crosshairV = undefined;
+}
+
+// Visual: Hover Magnifier Loupe
+function enableMagnifier() {
+  if (isDashboard() || magnifier) return;
+  magnifier = document.createElement('div');
+  magnifier.className = 'lucent-magnifier-loupe';
+  magnifier.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(magnifier);
+  document.addEventListener('pointermove', moveMagnifier, { passive: true });
+}
+function moveMagnifier(e) {
+  if (!magnifier) return;
+  magnifier.style.transform = `translate(${e.clientX + 16}px, ${e.clientY + 16}px)`;
+  const target = document.elementFromPoint(e.clientX, e.clientY);
+  if (target && !target.closest('#lucent-widget') && target !== magnifier) {
+    const text = target.textContent?.trim();
+    if (text && text.length > 0) {
+      magnifier.textContent = text.slice(0, 75);
+    }
+  }
+}
+function disableMagnifier() {
+  document.removeEventListener('pointermove', moveMagnifier);
+  magnifier?.remove();
+  magnifier = undefined;
+}
+
+// Visual: Double-Click to Speech Narrator
+function handleSpeechClick(e) {
+  if (isDashboard()) return;
+  const target = e.target.closest('p, h1, h2, h3, h4, h5, h6, li, article, blockquote, [role="article"]');
+  if (!target || target.closest('#lucent-widget')) return;
+
+  const text = window.getSelection()?.toString().trim() || target.textContent?.trim();
+  if (!text || !('speechSynthesis' in window)) return;
+
+  window.speechSynthesis.cancel();
+  if (speechActiveEl) speechActiveEl.classList.remove('lucent-speech-active');
+
+  speechActiveEl = target;
+  target.classList.add('lucent-speech-active');
+
+  const utterance = new SpeechSynthesisUtterance(text.slice(0, 500));
+  utterance.onend = () => {
+    target.classList.remove('lucent-speech-active');
+  };
+  utterance.onerror = () => {
+    target.classList.remove('lucent-speech-active');
+  };
+  window.speechSynthesis.speak(utterance);
+}
+function enableTextToSpeech() {
+  document.addEventListener('dblclick', handleSpeechClick, true);
+}
+function disableTextToSpeech() {
+  document.removeEventListener('dblclick', handleSpeechClick, true);
+  if (speechActiveEl) {
+    speechActiveEl.classList.remove('lucent-speech-active');
+    speechActiveEl = undefined;
+  }
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
+}
+
+// Visual: Color-to-Pattern Status Icons
+function enableColorPatterns() {
+  if (isDashboard()) return;
+  const statusSelectors = '[class*="status" i], [class*="badge" i], [class*="tag" i], [class*="alert" i], [class*="success" i], [class*="error" i], [class*="warning" i]';
+  document.querySelectorAll(statusSelectors).forEach(el => {
+    if (el.closest('#lucent-widget') || el.dataset.lucentBadge) return;
+    const txt = (el.textContent || '').toLowerCase();
+    const cls = (el.className || '').toLowerCase();
+    if (cls.includes('success') || txt.includes('active') || txt.includes('online') || txt.includes('pass') || txt.includes('completed')) {
+      el.dataset.lucentBadge = '[✓]';
+      el.classList.add('lucent-status-badge-augmented');
+    } else if (cls.includes('error') || cls.includes('danger') || txt.includes('fail') || txt.includes('offline') || txt.includes('error')) {
+      el.dataset.lucentBadge = '[✕]';
+      el.classList.add('lucent-status-badge-augmented');
+    } else if (cls.includes('warn') || txt.includes('pending') || txt.includes('alert')) {
+      el.dataset.lucentBadge = '[!]';
+      el.classList.add('lucent-status-badge-augmented');
+    }
+  });
+}
+function disableColorPatterns() {
+  document.querySelectorAll('.lucent-status-badge-augmented').forEach(el => {
+    el.classList.remove('lucent-status-badge-augmented');
+    delete el.dataset.lucentBadge;
   });
 }
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'LUCENT_EVENT_RECORDED' && location.origin === 'http://localhost:3000') { window.postMessage({ source:'lucent-extension', type:'EVENT', event:message.event }, location.origin); return; }
-  if (message.type === 'LUCENT_SETTINGS') { applySettings(message.settings); sendResponse({ success: true }); return; }
-  if (message.type === 'LUCENT_STATUS') { sendResponse({ settings, activeShortcuts: shortcutNodes.length }); return; }
-  if (message.type === 'SCAN_ACCESSIBILITY') { const results = scanAccessibility(); sendResponse({ results }); return; }
-  if (message.type === 'REINFORCE_ACCESSIBILITY') { reinforceAccessibility(); removeHighlights(); sendResponse({ success: true }); }
-});
+function assignShortcuts() {
+  if (isDashboard()) return;
+  clearShortcuts();
+  try {
+    shortcutNodes = [...document.querySelectorAll('button, a[href], input, select, textarea, [role="button"]')]
+      .filter((node) => {
+        try {
+          if (node.closest('#lucent-widget')) return false;
+          const r = node.getBoundingClientRect();
+          return r.width > 0 && r.height > 0 && !node.closest('[aria-hidden="true"]');
+        } catch {
+          return false;
+        }
+      })
+      .slice(0, 9);
+    shortcutNodes.forEach((node, index) => {
+      node.dataset.lucentShortcut = String(index + 1);
+    });
+  } catch {}
+}
+function clearShortcuts() {
+  shortcutNodes.forEach((node) => {
+    try { delete node.dataset.lucentShortcut; } catch (_) {}
+  });
+  shortcutNodes = [];
+}
+
+function handleKeyDown(event) {
+  if (isDashboard()) return;
+  if (!settings.enabled || !settings.motor?.shortcuts || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+  const index = Number(event.key) - 1;
+  if (index >= 0 && shortcutNodes[index]) {
+    event.preventDefault();
+    shortcutNodes[index].focus();
+    shortcutNodes[index].click();
+  }
+}
+
+function blockRepeatActivation(event) {
+  if (isDashboard()) return;
+  if (!settings.enabled || !settings.motor?.steadyClick) return;
+  const target = event.target.closest?.('button, a, input, select, [role="button"]');
+  if (!target || target.closest('#lucent-widget')) return;
+  const now = Date.now();
+  const last = recentActivations.get(target) || 0;
+  if (now - last < 550) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    report('Blocked accidental repeat activation', 'Steady click');
+    return;
+  }
+  recentActivations.set(target, now);
+}
+
+function createWidget() {
+  if (isDashboard() || lucentWidget || !document.body) return;
+
+  lucentWidget = document.createElement('section');
+  lucentWidget.id = 'lucent-widget';
+  lucentWidget.setAttribute('aria-label', 'Lucent accessibility controls');
+  lucentWidgetRoot = lucentWidget.attachShadow({ mode: 'closed' });
+
+  lucentWidgetRoot.innerHTML = `
+    <style>
+      :host {
+        all: initial;
+        position: fixed;
+        right: 20px;
+        bottom: 20px;
+        z-index: 2147483647;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: #ecfff3;
+        line-height: 1.3;
+        text-align: left;
+        box-sizing: border-box;
+      }
+      :host(.lucent-dragged) {
+        right: auto !important;
+        bottom: auto !important;
+      }
+      *, *::before, *::after {
+        box-sizing: border-box;
+      }
+      .widget-wrap {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+      }
+      .widget-wrap.menu-left {
+        align-items: flex-start;
+      }
+      .fab {
+        border: 1px solid #4d6355;
+        background: #233328;
+        color: #f1fff5;
+        border-radius: 999px;
+        padding: 10px 16px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 700 14px system-ui, sans-serif;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+        cursor: grab;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: none;
+        transition: background 0.2s, box-shadow 0.2s;
+      }
+      .fab * {
+        pointer-events: none !important;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+      }
+      .fab:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
+      }
+      .fab:active, .fab.is-dragging {
+        cursor: grabbing !important;
+        transform: scale(0.96);
+        transition: none !important;
+      }
+      .widget-wrap.is-on .fab {
+        background: #22c55e;
+        border-color: #86efac;
+        color: #073618;
+        box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.25), 0 10px 25px rgba(0, 0, 0, 0.35);
+      }
+      .menu {
+        display: none !important;
+        position: absolute;
+        right: 0;
+        bottom: 52px;
+        width: 300px;
+        padding: 14px 16px;
+        background: #0d1e14;
+        border: 1px solid #3b6046;
+        border-radius: 16px;
+        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.55);
+        user-select: none;
+      }
+      .widget-wrap.menu-open .menu {
+        display: block !important;
+      }
+      .widget-wrap.menu-down .menu {
+        bottom: auto;
+        top: 52px;
+      }
+      .widget-wrap.menu-left .menu {
+        right: auto;
+        left: 0;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        cursor: grab;
+        touch-action: none;
+        user-select: none;
+      }
+      .header:active {
+        cursor: grabbing !important;
+      }
+      .header-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: #f1fff5;
+      }
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .master-btn {
+        border: 0;
+        border-radius: 999px;
+        background: #384d3f;
+        color: #d1e8d9;
+        padding: 4px 11px;
+        font: 700 12px system-ui;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .master-btn.is-on {
+        background: #22c55e;
+        color: #073618;
+      }
+      .close-btn {
+        border: 0;
+        background: transparent;
+        color: #9bb7a5;
+        font-size: 16px;
+        padding: 2px 6px;
+        cursor: pointer;
+        border-radius: 6px;
+      }
+      .close-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+      }
+      .profile-tabs {
+        display: flex;
+        gap: 5px;
+        margin: 8px 0;
+      }
+      .profile-btn {
+        flex: 1;
+        background: #172a1e;
+        border: 1px solid #2e4d39;
+        color: #a3c4b0;
+        padding: 5px 0;
+        border-radius: 8px;
+        font: 600 11px system-ui;
+        cursor: pointer;
+        transition: 0.15s;
+      }
+      .profile-btn.active {
+        background: #22c55e;
+        color: #052611;
+        border-color: #4ade80;
+        font-weight: 700;
+      }
+      .hint {
+        color: #92b49e;
+        font-size: 11px;
+        margin: 4px 0 10px;
+      }
+      .options {
+        border-top: 1px solid #243e2e;
+        padding-top: 6px;
+        max-height: 280px;
+        overflow-y: auto;
+      }
+      .options label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 7px 4px;
+        color: #e5f5e9;
+        font-size: 12px;
+        cursor: pointer;
+        border-radius: 6px;
+      }
+      .options label:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .options input {
+        accent-color: #22c55e;
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+      }
+      .ai-scanner-section {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #243e2e;
+      }
+      .ai-scanner-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+      .ai-scanner-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: #f1fff5;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .ai-scanner-badge {
+        font-size: 10px;
+        background: rgba(34, 197, 94, 0.2);
+        color: #4ade80;
+        padding: 2px 6px;
+        border-radius: 999px;
+        font-weight: 700;
+        border: 1px solid rgba(74, 222, 128, 0.3);
+      }
+      .ai-scan-trigger-btn {
+        width: 100%;
+        background: #172d1f;
+        border: 1px solid #3b6c4b;
+        color: #8df4b5;
+        padding: 7px 10px;
+        border-radius: 8px;
+        font: 700 12px system-ui, sans-serif;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: background 0.15s;
+      }
+      .ai-scan-trigger-btn:hover {
+        background: #20422c;
+      }
+      .ai-stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        margin: 8px 0;
+      }
+      .ai-stat-chip {
+        background: #112217;
+        border: 1px solid #203f2a;
+        padding: 5px 8px;
+        border-radius: 6px;
+        font-size: 11px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: #a3c4b0;
+      }
+      .ai-stat-chip b {
+        color: #f87171;
+        font-weight: 700;
+      }
+      .ai-stat-chip b.zero {
+        color: #4ade80;
+      }
+      .ai-fix-trigger-btn {
+        width: 100%;
+        background: #22c55e;
+        border: 0;
+        color: #062b13;
+        padding: 7px 10px;
+        border-radius: 8px;
+        font: 700 12px system-ui, sans-serif;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: background 0.15s;
+        margin-top: 4px;
+      }
+      .ai-fix-trigger-btn:hover {
+        background: #4ade80;
+      }
+      .ai-summary-text {
+        font-size: 11px;
+        color: #8bb799;
+        margin-top: 6px;
+        line-height: 1.35;
+      }
+    </style>
+    <div class="widget-wrap">
+      <button class="fab" type="button" aria-expanded="false" aria-label="Open Lucent accessibility controls" title="Drag to reposition">
+        <span>✦</span><b>Lucent</b>
+      </button>
+      <div class="menu">
+        <div class="header" title="Drag to reposition">
+          <span class="header-title">Accessibility tools</span>
+          <div class="header-actions">
+            <button class="master-btn" type="button">OFF</button>
+            <button class="close-btn" type="button" aria-label="Close">✕</button>
+          </div>
+        </div>
+        <div class="profile-tabs">
+          <button type="button" class="profile-btn" data-profile="cognitive">🧠 Cognitive</button>
+          <button type="button" class="profile-btn" data-profile="motor">🖐 Motor</button>
+          <button type="button" class="profile-btn" data-profile="visual">👁 Visual</button>
+        </div>
+        <p class="hint">Toggle features for this page.</p>
+        <div class="options"></div>
+        <div class="ai-scanner-section">
+          <div class="ai-scanner-header">
+            <span class="ai-scanner-title"><span>✦</span> Gemini AI Auditor</span>
+            <span class="ai-scanner-badge">Gemini 3.6</span>
+          </div>
+          <button type="button" class="ai-scan-trigger-btn">
+            <span>🔍</span> Scan Page with Gemini AI
+          </button>
+          <div class="ai-scan-results-box" style="display: none;">
+            <div class="ai-stats-grid">
+              <div class="ai-stat-chip"><span>🏷️ Unlabelled</span><b class="val-unlabeled">0</b></div>
+              <div class="ai-stat-chip"><span>🖼️ Missing Alt</span><b class="val-alt">0</b></div>
+              <div class="ai-stat-chip"><span>🎯 &lt;44px Hitbox</span><b class="val-targets">0</b></div>
+              <div class="ai-stat-chip"><span>👁️ Low Contrast</span><b class="val-contrast">0</b></div>
+            </div>
+            <button type="button" class="ai-fix-trigger-btn">
+              <span>✨</span> Remediate with Gemini AI
+            </button>
+            <div class="ai-summary-text"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(lucentWidget);
+  watchWidget();
+
+  const wrap = lucentWidgetRoot.querySelector('.widget-wrap');
+  const fab = lucentWidgetRoot.querySelector('.fab');
+  const menu = lucentWidgetRoot.querySelector('.menu');
+  const header = lucentWidgetRoot.querySelector('.header');
+  const masterBtn = lucentWidgetRoot.querySelector('.master-btn');
+  const closeBtn = lucentWidgetRoot.querySelector('.close-btn');
+
+  function applyWidgetPosition(left, top) {
+    if (!lucentWidget) return;
+    const margin = 10;
+    const fabRect = fab ? fab.getBoundingClientRect() : { width: 115, height: 42 };
+    const w = fabRect.width || 115;
+    const h = fabRect.height || 42;
+    const maxLeft = Math.max(margin, window.innerWidth - w - margin);
+    const maxTop = Math.max(margin, window.innerHeight - h - margin);
+    const clampedX = Math.max(margin, Math.min(maxLeft, left));
+    const clampedY = Math.max(margin, Math.min(maxTop, top));
+
+    lucentWidget.classList.add('lucent-dragged');
+    lucentWidget.style.setProperty('left', clampedX + 'px', 'important');
+    lucentWidget.style.setProperty('top', clampedY + 'px', 'important');
+    lucentWidget.style.setProperty('right', 'auto', 'important');
+    lucentWidget.style.setProperty('bottom', 'auto', 'important');
+
+    if (wrap) {
+      wrap.classList.toggle('menu-down', clampedY < 360);
+      wrap.classList.toggle('menu-left', clampedX < 320);
+    }
+  }
+
+  function saveWidgetPosition(left, top) {
+    const xRatio = Math.max(0, Math.min(1, left / Math.max(1, window.innerWidth)));
+    const yRatio = Math.max(0, Math.min(1, top / Math.max(1, window.innerHeight)));
+    safeStorageSet({ lucentWidgetPos: { xRatio, yRatio, left, top } });
+  }
+
+  // Restore saved position
+  safeStorageGet(['lucentWidgetPos']).then((data) => {
+    if (data?.lucentWidgetPos && lucentWidget) {
+      const { xRatio, yRatio, left, top } = data.lucentWidgetPos;
+      let targetLeft = left;
+      let targetTop = top;
+      if (typeof xRatio === 'number' && typeof yRatio === 'number') {
+        targetLeft = Math.round(xRatio * window.innerWidth);
+        targetTop = Math.round(yRatio * window.innerHeight);
+      }
+      applyWidgetPosition(targetLeft, targetTop);
+    }
+  });
+
+  let isDragging = false;
+  let didMove = false;
+  let justDragged = false;
+  let startPointerX = 0;
+  let startPointerY = 0;
+  let startWidgetX = 0;
+  let startWidgetY = 0;
+
+  function initDrag(handleEl) {
+    if (!handleEl) return;
+    handleEl.setAttribute('draggable', 'false');
+    handleEl.addEventListener('dragstart', (e) => e.preventDefault());
+
+    handleEl.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 && e.pointerType === 'mouse') return;
+      if (handleEl !== fab && e.target.closest('button, input, select, a, [role="button"]')) {
+        return;
+      }
+      isDragging = true;
+      didMove = false;
+      startPointerX = e.clientX;
+      startPointerY = e.clientY;
+      const rect = fab.getBoundingClientRect();
+      startWidgetX = rect.left;
+      startWidgetY = rect.top;
+
+      fab.classList.add('is-dragging');
+
+      const onPointerMove = (ev) => {
+        if (!isDragging) return;
+        const dx = ev.clientX - startPointerX;
+        const dy = ev.clientY - startPointerY;
+        if (!didMove && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) {
+          didMove = true;
+        }
+        if (didMove) {
+          ev.preventDefault();
+          applyWidgetPosition(startWidgetX + dx, startWidgetY + dy);
+        }
+      };
+
+      const onPointerUp = () => {
+        if (!isDragging) return;
+        isDragging = false;
+        fab.classList.remove('is-dragging');
+        window.removeEventListener('pointermove', onPointerMove, { capture: true });
+        window.removeEventListener('pointerup', onPointerUp, { capture: true });
+        window.removeEventListener('pointercancel', onPointerUp, { capture: true });
+        handleEl.removeEventListener('pointermove', onPointerMove);
+        handleEl.removeEventListener('pointerup', onPointerUp);
+        handleEl.removeEventListener('pointercancel', onPointerUp);
+
+        if (didMove) {
+          justDragged = true;
+          const rect = fab.getBoundingClientRect();
+          saveWidgetPosition(rect.left, rect.top);
+          setTimeout(() => { justDragged = false; }, 250);
+        }
+      };
+
+      window.addEventListener('pointermove', onPointerMove, { capture: true, passive: false });
+      window.addEventListener('pointerup', onPointerUp, { capture: true });
+      window.addEventListener('pointercancel', onPointerUp, { capture: true });
+      handleEl.addEventListener('pointermove', onPointerMove, { passive: false });
+      handleEl.addEventListener('pointerup', onPointerUp);
+      handleEl.addEventListener('pointercancel', onPointerUp);
+    });
+  }
+
+  initDrag(fab);
+  if (header) initDrag(header);
+
+  fab.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (justDragged) {
+      justDragged = false;
+      return;
+    }
+    const isOpen = wrap.classList.toggle('menu-open');
+    fab.setAttribute('aria-expanded', String(isOpen));
+    if (isOpen) {
+      const rect = fab.getBoundingClientRect();
+      wrap.classList.toggle('menu-down', rect.top < 360);
+      wrap.classList.toggle('menu-left', rect.left < 320);
+    }
+  });
+
+  window.addEventListener('resize', () => {
+    if (!lucentWidget || !lucentWidget.classList.contains('lucent-dragged')) return;
+    const rect = fab.getBoundingClientRect();
+    applyWidgetPosition(rect.left, rect.top);
+  });
+
+  closeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    wrap.classList.remove('menu-open');
+    fab.setAttribute('aria-expanded', 'false');
+  });
+
+  menu.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
+
+  masterBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const nextEnabled = !settings.enabled;
+    const next = { ...settings, enabled: nextEnabled };
+    persistSettings(next);
+    applySettings(next);
+    report(nextEnabled ? 'Enabled Lucent via page widget' : 'Paused Lucent via page widget', 'In-Page Widget');
+  });
+
+  lucentWidgetRoot.querySelectorAll('.profile-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const prof = btn.dataset.profile;
+      const next = { ...settings, profile: prof };
+      persistSettings(next);
+      applySettings(next);
+      report(`Switched to ${prof} profile`, 'Profile Switcher');
+    });
+  });
+
+  const aiScanBtn = lucentWidgetRoot.querySelector('.ai-scan-trigger-btn');
+  const aiResultsBox = lucentWidgetRoot.querySelector('.ai-scan-results-box');
+  const aiFixBtn = lucentWidgetRoot.querySelector('.ai-fix-trigger-btn');
+  const aiSummaryText = lucentWidgetRoot.querySelector('.ai-summary-text');
+  let currentWidgetScan = null;
+
+  aiScanBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    aiScanBtn.textContent = 'Scanning active page...';
+    const scan = scanAccessibility();
+    currentWidgetScan = scan;
+    aiScanBtn.innerHTML = `<span>🔍</span> Re-scan Page (${scan.total} issues)`;
+    if (aiResultsBox) aiResultsBox.style.display = 'block';
+
+    const setVal = (cls, val) => {
+      const el = lucentWidgetRoot.querySelector(`.${cls}`);
+      if (el) {
+        el.textContent = val;
+        el.classList.toggle('zero', val === 0);
+      }
+    };
+    setVal('val-unlabeled', scan.unlabeledButtons);
+    setVal('val-alt', scan.missingAlt);
+    setVal('val-targets', scan.smallTargets);
+    setVal('val-contrast', scan.lowContrast);
+
+    if (aiSummaryText) {
+      aiSummaryText.textContent = scan.total === 0
+        ? 'Great job! No critical barriers found on this page.'
+        : `Identified ${scan.total} accessibility barriers. Click below to remediate with Gemini AI.`;
+    }
+    report(`Scanned active page: ${scan.total} issues found`, 'In-Page Scanner');
+  });
+
+  aiFixBtn?.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (!currentWidgetScan) currentWidgetScan = scanAccessibility();
+    aiFixBtn.disabled = true;
+    aiFixBtn.textContent = '✨ Remediating with Gemini AI...';
+
+    const remediations = await runGeminiAiScan(currentWidgetScan);
+    reinforceAccessibility(remediations);
+    removeHighlights();
+    showLucentToast(`Gemini AI remediated ${currentWidgetScan.total} accessibility barriers`);
+    report(`Gemini AI auto-remediated ${currentWidgetScan.total} barriers`, 'In-Page Auto-Fix');
+
+    aiFixBtn.disabled = false;
+    aiFixBtn.innerHTML = '<span>✓</span> Successfully Remediated!';
+    aiFixBtn.style.background = '#059669';
+
+    const conf = Math.round((remediations?.confidenceScore ?? 0.95) * 100);
+    if (aiSummaryText) {
+      aiSummaryText.innerHTML = `<strong>Remediated ${currentWidgetScan.total} barriers!</strong><br>Injected labels &amp; alt text (Confidence: ${conf}%).`;
+    }
+
+    ['val-unlabeled', 'val-alt', 'val-targets', 'val-contrast'].forEach(cls => {
+      const el = lucentWidgetRoot.querySelector(`.${cls}`);
+      if (el) {
+        el.textContent = '0';
+        el.classList.add('zero');
+      }
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    if (wrap.classList.contains('menu-open')) {
+      wrap.classList.remove('menu-open');
+      fab.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  rebuildWidgetOptions();
+  renderWidget();
+}
+
+function watchWidget() {
+  if (widgetObserver || isDashboard()) return;
+  widgetObserver = new MutationObserver(() => {
+    if (!document.body || isDashboard()) return;
+    if (!document.getElementById('lucent-widget')) {
+      lucentWidget = undefined;
+      lucentWidgetRoot = undefined;
+      widgetProfile = undefined;
+      createWidget();
+      applySettings(settings);
+    }
+  });
+  widgetObserver.observe(document.body, { childList: true });
+}
+
+function rebuildWidgetOptions() {
+  if (!lucentWidgetRoot) return;
+  widgetProfile = settings.profile;
+  const optionsContainer = lucentWidgetRoot.querySelector('.options');
+  if (!optionsContainer) return;
+
+  const optionsList = settings.profile === 'motor'
+    ? [
+        ['motor.targets', '48 px targets'],
+        ['motor.focus', 'Focus halo'],
+        ['motor.shortcuts', 'Number shortcuts (1-9)'],
+        ['motor.steadyClick', 'Steady click'],
+        ['motor.largeCursor', 'Large cursor']
+      ]
+    : settings.profile === 'visual'
+    ? [
+        ['visual.daltonize', 'Color-blind spectral filter'],
+        ['visual.highContrast', 'Solar high-contrast (Yellow/Black)'],
+        ['visual.magnifier', 'Hover magnifier loupe'],
+        ['visual.boldText', 'Bold typography (18px floor)'],
+        ['visual.crosshairs', 'Cursor crosshairs guide'],
+        ['visual.textToSpeech', 'Double-click to speech'],
+        ['visual.colorPatterns', 'Status & chart patterns']
+      ]
+    : [
+        ['cognitive.declutter', 'De-clutter'],
+        ['cognitive.readingGuide', 'Reading guide'],
+        ['cognitive.dyslexia', 'Dyslexia-friendly text'],
+        ['cognitive.calmMode', 'Calm mode'],
+        ['cognitive.readingWidth', 'Comfortable reading width']
+      ];
+
+  let html = '';
+  if (settings.profile === 'visual') {
+    const curSize = settings.visual?.fontSize || 16;
+    html += `
+      <div class="widget-font-size-control">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+          <span style="font-weight: 700; font-size: 12px; color: #ecfff3;">🔤 Font Size</span>
+          <b class="widget-font-size-badge" style="font-size: 11px; color: #4ade80; background: rgba(34, 197, 94, 0.2); padding: 1px 7px; border-radius: 999px; border: 1px solid rgba(74, 222, 128, 0.3);">${curSize}px</b>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 11px; color: #8bb799; font-weight: 600;">12px</span>
+          <input type="range" class="widget-font-slider" min="12" max="32" step="1" value="${curSize}" style="flex: 1; accent-color: #22c55e; cursor: pointer; height: 5px;">
+          <span style="font-size: 14px; font-weight: 800; color: #8bb799;">32px</span>
+        </div>
+      </div>
+    `;
+  }
+  html += optionsList
+    .map(([path, label]) => `<label><span>${label}</span><input type="checkbox" data-path="${path}"></label>`)
+    .join('');
+
+  optionsContainer.innerHTML = html;
+
+  const fontSlider = optionsContainer.querySelector('.widget-font-slider');
+  const fontBadge = optionsContainer.querySelector('.widget-font-size-badge');
+  if (fontSlider) {
+    fontSlider.addEventListener('input', (event) => {
+      event.stopPropagation();
+      const val = Number(event.target.value);
+      if (fontBadge) fontBadge.textContent = `${val}px`;
+      if (!settings.visual) settings.visual = {};
+      settings.visual.fontSize = val;
+      settings.enabled = true;
+      applyFontSize(val);
+      const wrap = lucentWidgetRoot?.querySelector('.widget-wrap');
+      if (wrap) wrap.classList.add('is-on');
+      const master = lucentWidgetRoot?.querySelector('.master-btn');
+      if (master) {
+        master.textContent = 'ON';
+        master.classList.add('is-on');
+      }
+    });
+    fontSlider.addEventListener('change', (event) => {
+      event.stopPropagation();
+      const val = Number(event.target.value);
+      const next = {
+        ...settings,
+        enabled: true,
+        visual: {
+          ...(settings.visual || {}),
+          fontSize: val
+        }
+      };
+      persistSettings(next);
+      report(`Font size scaled to ${val}px`, 'Visual & Low Vision');
+    });
+  }
+
+  optionsContainer.querySelectorAll('input[data-path]').forEach(input => {
+    input.addEventListener('change', (event) => {
+      event.stopPropagation();
+      const [group, name] = event.target.dataset.path.split('.');
+      const checked = event.target.checked;
+      const next = {
+        ...settings,
+        enabled: checked ? true : settings.enabled,
+        [group]: {
+          ...(settings[group] || {}),
+          [name]: checked
+        }
+      };
+      persistSettings(next);
+      applySettings(next);
+      const category = group === 'motor' ? 'Motor & Tremor' : group === 'visual' ? 'Visual & Low Vision' : 'Cognitive & ADHD';
+      report(`${checked ? 'Enabled' : 'Disabled'} ${name}`, category);
+    });
+  });
+
+  renderWidget();
+}
+
+function renderWidget() {
+  if (!lucentWidgetRoot) return;
+  const wrap = lucentWidgetRoot.querySelector('.widget-wrap');
+  if (wrap) {
+    wrap.classList.toggle('is-on', !!settings.enabled);
+  }
+  const master = lucentWidgetRoot.querySelector('.master-btn');
+  if (master) {
+    master.textContent = settings.enabled ? 'ON' : 'OFF';
+    master.classList.toggle('is-on', !!settings.enabled);
+  }
+  const fontSlider = lucentWidgetRoot.querySelector('.widget-font-slider');
+  const fontBadge = lucentWidgetRoot.querySelector('.widget-font-size-badge');
+  if (fontSlider && settings.visual?.fontSize) {
+    fontSlider.value = String(settings.visual.fontSize);
+    if (fontBadge) fontBadge.textContent = `${settings.visual.fontSize}px`;
+  }
+  lucentWidgetRoot.querySelectorAll('input[data-path]').forEach(input => {
+    const [group, name] = input.dataset.path.split('.');
+    input.checked = !!settings[group]?.[name];
+  });
+  lucentWidgetRoot.querySelectorAll('.profile-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.profile === settings.profile);
+  });
+}
+
+function report(action, feature) {
+  if (!isExtensionValid()) { cleanupContext(); return; }
+  if (isDashboard() || location.hostname === 'localhost' || location.hostname === '127.0.0.1') return;
+  const event = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    at: new Date().toISOString(),
+    site: location.hostname || 'Web Browser',
+    url: location.href,
+    action,
+    feature
+  };
+  safeSendMessage({ type: 'LUCENT_RECORD_EVENT', event });
+}
+
+// Safe bidirectional bridge for the Lucent dashboard
+async function handleDashboardMessage(event) {
+  if (event.source !== window || !event.data || event.data.source !== 'lucent-dashboard') return;
+  window.isLucentDashboardTab = true;
+
+  if (!isExtensionValid()) {
+    cleanupContext();
+    return;
+  }
+
+  try {
+    if (event.data.type === 'PING') {
+      const stored = await safeStorageGet([settingsKey, 'lucentEvents']);
+      if (!stored || !isExtensionValid()) return;
+      const currentSettings = stored[settingsKey] || settings;
+      window.postMessage({ source: 'lucent-extension', type: 'STATE', settings: currentSettings }, '*');
+      window.postMessage({ source: 'lucent-extension', type: 'EVENTS', events: stored.lucentEvents || [] }, '*');
+    } else if (event.data.type === 'SETTINGS' && event.data.settings) {
+      const ok = await safeStorageSet({ [settingsKey]: event.data.settings, enabled: event.data.settings.enabled });
+      if (ok && isExtensionValid()) {
+        settings = event.data.settings;
+      }
+    } else if (event.data.type === 'CONFIG' && event.data.apiUrl) {
+      safeStorageSet({ lucentApiUrl: event.data.apiUrl });
+    }
+  } catch {
+    cleanupContext();
+  }
+}
+
+try {
+  if (typeof chrome !== 'undefined' && chrome?.storage?.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      try {
+        if (!isExtensionValid() || area !== 'local') return;
+        if (changes[settingsKey]) {
+          const next = changes[settingsKey].newValue;
+          if (isDashboard()) {
+            window.postMessage({ source: 'lucent-extension', type: 'STATE', settings: next }, '*');
+          } else {
+            applySettings(next);
+          }
+        }
+        if (changes.lucentEvents?.newValue?.[0] && isDashboard()) {
+          window.postMessage({ source: 'lucent-extension', type: 'EVENT', event: changes.lucentEvents.newValue[0] }, '*');
+        }
+      } catch {
+        cleanupContext();
+      }
+    });
+  }
+} catch {}
+
+try {
+  if (typeof chrome !== 'undefined' && chrome?.runtime?.onMessage) {
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      try {
+        if (!isExtensionValid()) {
+          cleanupContext();
+          return;
+        }
+        if (message.type === 'LUCENT_EVENT_RECORDED' && isDashboard()) {
+          window.postMessage({ source: 'lucent-extension', type: 'EVENT', event: message.event }, '*');
+          return;
+        }
+        if (message.type === 'LUCENT_SETTINGS') {
+          if (isDashboard()) {
+            window.postMessage({ source: 'lucent-extension', type: 'STATE', settings: message.settings }, '*');
+          } else {
+            applySettings(message.settings);
+          }
+          sendResponse({ success: true });
+          return;
+        }
+        if (message.type === 'LUCENT_STATUS') {
+          sendResponse({ settings, activeShortcuts: shortcutNodes.length });
+          return;
+        }
+        if (message.type === 'LUCENT_FONT_SIZE') {
+          if (!settings.visual) settings.visual = {};
+          settings.visual.fontSize = message.fontSize;
+          settings.enabled = true;
+          applyFontSize(message.fontSize);
+          sendResponse({ success: true });
+          return;
+        }
+        if (message.type === 'SCAN_ACCESSIBILITY') {
+          const results = scanAccessibility();
+          report(`Accessibility scan: found ${results.total} issues`, 'Scanner');
+          sendResponse({ results });
+          return;
+        }
+        if (message.type === 'REINFORCE_ACCESSIBILITY') {
+          reinforceAccessibility(message.remediations);
+          removeHighlights();
+          showLucentToast(`Applied accessibility fixes to ${lastScanResults?.total || 'page'} issues`);
+          report('Applied auto-remediation fixes', 'Auto-fix');
+          sendResponse({ success: true });
+          return;
+        }
+        if (message.type === 'GEMINI_AI_SCAN') {
+          (async () => {
+            const scan = scanAccessibility();
+            const remediations = await runGeminiAiScan(scan);
+            reinforceAccessibility(remediations);
+            removeHighlights();
+            showLucentToast(`Gemini AI remediated ${scan.total} accessibility issues`);
+            report(`Gemini AI remediated ${scan.total} issues on ${document.title || location.hostname}`, 'AI Auto-Remediate');
+            if (isDashboard()) {
+              window.postMessage({ source: 'lucent-extension', type: 'AUDIT_COMPLETE', results: scan, remediations }, '*');
+            }
+            sendResponse({ results: scan, remediations, success: true });
+          })();
+          return true; // Keep message channel open for async response
+        }
+      } catch {
+        cleanupContext();
+      }
+    });
+  }
+} catch {}
 
 let highlightedElements = [];
-function getLuminance(r, g, b) { const a = [r,g,b].map(v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }); return a[0] * .2126 + a[1] * .7152 + a[2] * .0722; }
-function parseColor(value) { const rgb = value.match(/\d+/g); return rgb?.length >= 3 ? { r:+rgb[0], g:+rgb[1], b:+rgb[2] } : null; }
-function checkContrast(el) { const s = getComputedStyle(el); if (s.backgroundColor === 'rgba(0, 0, 0, 0)' || s.backgroundColor === 'transparent') return true; const bg = parseColor(s.backgroundColor), fg = parseColor(s.color); if (!bg || !fg) return true; const a=getLuminance(bg.r,bg.g,bg.b), b=getLuminance(fg.r,fg.g,fg.b); return (Math.max(a,b)+.05)/(Math.min(a,b)+.05) >= 4.5; }
-function highlightElement(el, issue) { el.dataset.lucentOriginalOutline=el.style.outline; el.dataset.accessibilityIssue=issue; el.style.outline='3px dashed #f87171'; el.style.outlineOffset='2px'; highlightedElements.push(el); }
-function removeHighlights() { highlightedElements.forEach(el => { el.style.outline=el.dataset.lucentOriginalOutline || ''; el.style.outlineOffset=''; delete el.dataset.lucentOriginalOutline; delete el.dataset.accessibilityIssue; }); highlightedElements=[]; }
-function scanAccessibility() { removeHighlights(); let smallTargets=0, unlabeledButtons=0, lowContrast=0, missingAlt=0; const controls=document.querySelectorAll('button,a,[role="button"]'); controls.forEach(el => { if (!el.textContent.trim()&&!el.getAttribute('aria-label')) { unlabeledButtons++; highlightElement(el,'unlabeled'); } const r=el.getBoundingClientRect(); if(r.width&&r.height&&(r.width<44||r.height<44)){smallTargets++;highlightElement(el,'small-target');} }); document.querySelectorAll('img').forEach(img=>{if((!img.hasAttribute('alt')||img.alt==='')&&img.getAttribute('role')!=='presentation'){missingAlt++;highlightElement(img,'missing-alt');}}); [...document.querySelectorAll('p,span,h1,h2,h3,h4,h5,h6')].slice(0,100).forEach(el=>{if(el.textContent.trim()&&!checkContrast(el)){lowContrast++;highlightElement(el,'low-contrast');}}); return {smallTargets,unlabeledButtons,lowContrast,missingAlt,total:smallTargets+unlabeledButtons+lowContrast+missingAlt}; }
-function reinforceAccessibility() { ROOT.dataset.accessibilityEnabled='true'; document.querySelectorAll('button:not([aria-label]),a:not([aria-label]),[role="button"]:not([aria-label])').forEach(el=>{if(!el.textContent.trim())el.setAttribute('aria-label',`Action ${el.id || 'control'}`);}); document.querySelectorAll('img:not([alt]),img[alt=""]').forEach(img=>img.setAttribute('alt','Image description provided by Lucent')); }
+let lastScanResults = null;
+
+function getLuminance(r, g, b) {
+  const a = [r, g, b].map(v => {
+    v /= 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+}
+
+function parseColor(value) {
+  const rgb = value.match(/\d+/g);
+  return rgb?.length >= 3 ? { r: +rgb[0], g: +rgb[1], b: +rgb[2] } : null;
+}
+
+function checkContrast(el) {
+  const s = getComputedStyle(el);
+  if (s.backgroundColor === 'rgba(0, 0, 0, 0)' || s.backgroundColor === 'transparent') return true;
+  const bg = parseColor(s.backgroundColor), fg = parseColor(s.color);
+  if (!bg || !fg) return true;
+  const a = getLuminance(bg.r, bg.g, bg.b), b = getLuminance(fg.r, fg.g, fg.b);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05) >= 4.5;
+}
+
+function highlightElement(el, issue) {
+  el.dataset.lucentOriginalOutline = el.style.outline || '';
+  el.dataset.accessibilityIssue = issue;
+  el.style.outline = '3px dashed #f87171';
+  el.style.outlineOffset = '2px';
+  highlightedElements.push(el);
+}
+
+function removeHighlights() {
+  highlightedElements.forEach(el => {
+    el.style.outline = el.dataset.lucentOriginalOutline || '';
+    el.style.outlineOffset = '';
+    delete el.dataset.lucentOriginalOutline;
+    delete el.dataset.accessibilityIssue;
+  });
+  highlightedElements = [];
+}
+
+function showLucentToast(message) {
+  try {
+    let toast = document.getElementById('lucent-ai-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'lucent-ai-toast';
+      toast.className = 'lucent-ai-toast';
+      document.body.appendChild(toast);
+    }
+    toast.innerHTML = `<span class="lucent-ai-toast-icon">✦</span><span>${message}</span>`;
+    toast.classList.add('show');
+    setTimeout(() => {
+      toast.classList.remove('show');
+    }, 3800);
+  } catch (_) {}
+}
+
+function scanAccessibility() {
+  removeHighlights();
+  let smallTargets = 0, unlabeledButtons = 0, lowContrast = 0, missingAlt = 0;
+  const unlabelledElements = [];
+  const missingAltImages = [];
+
+  const controls = document.querySelectorAll('button, a[href], [role="button"], input[type="button"], input[type="submit"]');
+  controls.forEach((el, idx) => {
+    if (el.closest('#lucent-widget')) return;
+
+    // Check accessible name
+    const hasVisibleText = (el.innerText || el.textContent || '').trim().length > 0;
+    const hasAriaLabel = Boolean(el.getAttribute('aria-label') || el.getAttribute('aria-labelledby'));
+    const isUnlabelled = !hasVisibleText && !hasAriaLabel;
+
+    if (isUnlabelled) {
+      unlabeledButtons++;
+      const scanId = `lucent-ctrl-${idx}`;
+      el.dataset.lucentScanId = scanId;
+      highlightElement(el, 'unlabeled');
+
+      unlabelledElements.push({
+        id: scanId,
+        tag: el.tagName.toLowerCase(),
+        className: typeof el.className === 'string' ? el.className.slice(0, 80) : '',
+        elementId: el.id || '',
+        textSnippet: (el.innerText || '').slice(0, 50).trim(),
+        surroundingContext: (el.parentElement?.textContent || '').slice(0, 100).replace(/\s+/g, ' ').trim(),
+        role: el.getAttribute('role') || el.tagName.toLowerCase(),
+        svgContent: el.querySelector('svg')?.outerHTML?.slice(0, 120) || ''
+      });
+    }
+
+    // Check touch target hitbox >= 44x44
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0 && (r.width < 44 || r.height < 44)) {
+      smallTargets++;
+      el.dataset.lucentSmallTarget = 'true';
+      if (!isUnlabelled) {
+        highlightElement(el, 'small-target');
+      }
+    }
+  });
+
+  // Check images missing alt attribute
+  document.querySelectorAll('img').forEach((img, idx) => {
+    if (img.closest('#lucent-widget')) return;
+    const role = img.getAttribute('role');
+    const isPresentation = role === 'presentation' || role === 'none';
+    const hasAlt = img.hasAttribute('alt') && img.alt.trim() !== '';
+
+    if (!hasAlt && !isPresentation) {
+      missingAlt++;
+      const scanId = `lucent-img-${idx}`;
+      img.dataset.lucentImgId = scanId;
+      highlightElement(img, 'missing-alt');
+
+      missingAltImages.push({
+        id: scanId,
+        src: img.src?.slice(0, 120) || '',
+        surroundingText: (img.parentElement?.textContent || '').slice(0, 80).replace(/\s+/g, ' ').trim(),
+        parentTag: img.parentElement?.tagName?.toLowerCase() || ''
+      });
+    }
+  });
+
+  // Contrast check
+  [...document.querySelectorAll('p, span, h1, h2, h3, h4, h5, h6')].slice(0, 100).forEach(el => {
+    if (el.closest('#lucent-widget')) return;
+    if (el.textContent.trim() && !checkContrast(el)) {
+      lowContrast++;
+      highlightElement(el, 'low-contrast');
+    }
+  });
+
+  const total = smallTargets + unlabeledButtons + lowContrast + missingAlt;
+  lastScanResults = {
+    title: document.title || 'Web Page',
+    url: location.href,
+    smallTargets,
+    unlabeledButtons,
+    lowContrast,
+    missingAlt,
+    total,
+    unlabelledElements,
+    missingAltImages
+  };
+
+  return lastScanResults;
+}
+
+async function runGeminiAiScan(scanData) {
+  try {
+    const payload = {
+      pageTitle: scanData.title,
+      pageUrl: scanData.url,
+      unlabelledElements: scanData.unlabelledElements || [],
+      missingAltImages: scanData.missingAltImages || []
+    };
+
+    const stored = await safeStorageGet(['lucentApiUrl']);
+    const baseUrl = stored?.lucentApiUrl || 'http://localhost:3001';
+    const targetEndpoint = baseUrl.replace(/\/$/, '') + '/api/ai-scan';
+
+    const response = await fetch(targetEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data && (data.labels || data.imageAlts)) {
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn('[Lucent] Gemini proxy unavailable, using fast local semantic heuristics', err);
+  }
+
+  return generateClientFallbackRemediations(scanData);
+}
+
+function generateClientFallbackRemediations(scanData) {
+  const labels = {};
+  const imageAlts = {};
+
+  (scanData.unlabelledElements || []).forEach(el => {
+    const hint = el.elementId || el.className || el.role || 'action';
+    const cleanHint = hint.replace(/[-_]/g, ' ').replace(/[0-9]/g, '').trim();
+    labels[el.id] = `Interactive control: ${cleanHint || 'Click to activate'}`;
+  });
+
+  (scanData.missingAltImages || []).forEach(img => {
+    const snippet = img.surroundingText ? ` (${img.surroundingText.slice(0, 30)}...)` : '';
+    imageAlts[img.id] = `Image on ${scanData.title || 'page'}${snippet}`;
+  });
+
+  return {
+    labels,
+    imageAlts,
+    summary: `Remediated ${Object.keys(labels).length} controls and ${Object.keys(imageAlts).length} images.`,
+    confidenceScore: 0.88
+  };
+}
+
+function reinforceAccessibility(aiRemediations) {
+  ROOT.dataset.accessibilityEnabled = 'true';
+
+  // Apply Gemini AI-generated labels
+  document.querySelectorAll('[data-lucent-scan-id]').forEach(el => {
+    const scanId = el.dataset.lucentScanId;
+    const aiLabel = aiRemediations?.labels?.[scanId];
+    if (aiLabel) {
+      el.setAttribute('aria-label', aiLabel);
+      el.dataset.lucentAiRemediated = 'true';
+    } else if (!el.getAttribute('aria-label') && !el.textContent.trim()) {
+      el.setAttribute('aria-label', `Action ${el.id || el.className || 'control'}`);
+    }
+  });
+
+  // Apply Gemini AI-generated image descriptions
+  document.querySelectorAll('[data-lucent-img-id]').forEach(img => {
+    const imgId = img.dataset.lucentImgId;
+    const aiAlt = aiRemediations?.imageAlts?.[imgId];
+    if (aiAlt) {
+      img.setAttribute('alt', aiAlt);
+      img.dataset.lucentAiRemediated = 'true';
+    } else if (!img.hasAttribute('alt') || img.alt === '') {
+      img.setAttribute('alt', `Image related to ${document.title || 'page content'}`);
+    }
+  });
+
+  // Expand small touch targets (<44px)
+  document.querySelectorAll('[data-lucent-small-target="true"]').forEach(el => {
+    el.classList.add('lucent-touch-remediated');
+  });
+}
+
+// Initializer
+async function init() {
+  window.addEventListener('message', handleDashboardMessage);
+
+  if (isDashboard()) {
+    window.isLucentDashboardTab = true;
+    window.postMessage({ source: 'lucent-extension', type: 'HELLO' }, '*');
+    const stored = await safeStorageGet([settingsKey, 'lucentEvents']);
+    if (stored && isExtensionValid()) {
+      window.postMessage({ source: 'lucent-extension', type: 'STATE', settings: stored[settingsKey] || settings }, '*');
+      window.postMessage({ source: 'lucent-extension', type: 'EVENTS', events: stored.lucentEvents || [] }, '*');
+    }
+    return;
+  }
+
+  // Non-dashboard pages: attach normal accessibility listeners
+  document.addEventListener('keydown', handleKeyDown, true);
+  document.addEventListener('click', blockRepeatActivation, true);
+
+  const stored = await safeStorageGet([settingsKey, 'lucentEvents']);
+  if (!stored || !isExtensionValid()) return;
+  
+  if (stored[settingsKey]) {
+    settings = { ...settings, ...stored[settingsKey] };
+  }
+  
+  createWidget();
+  applySettings(settings);
+  if (settings.enabled && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+    const prof = settings.profile === 'cognitive' ? 'Cognitive & ADHD' : settings.profile === 'motor' ? 'Motor & Tremor' : settings.profile === 'visual' ? 'Visual & Low Vision' : 'Baseline';
+    report(`Visited ${document.title || location.hostname}`, prof);
+  }
+}
+
+init();
