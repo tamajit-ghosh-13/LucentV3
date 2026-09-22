@@ -61,8 +61,8 @@ const DISABILITY_PROFILES: {
       icon: Eye,
       color: 'text-emerald-400',
       badgeBg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300',
-      description: 'Applies Daltonization color-blind filters, solar high-contrast themes, hover magnification loupe, 18px minimum text, and pattern overlays.',
-      features: ['Daltonization Color Blind Filters', 'Solar High-Contrast & Contrast Boost', 'Hover Magnifier Loupe & Crosshairs', 'Color-to-Pattern Texture Overlays']
+      description: 'Applies Daltonization color-blind filters, solar high-contrast themes, hover magnification loupe, 18px minimum text, and speech narrator.',
+      features: ['Daltonization Color Blind Filters', 'Solar High-Contrast & Contrast Boost', 'Hover Magnifier Loupe & Crosshairs', 'Click-to-Speech Narrator']
     },
     {
       id: 'raw',

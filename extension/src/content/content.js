@@ -6,7 +6,7 @@ let settings = {
   profile: 'cognitive',
   cognitive: { declutter: false, dyslexia: false, readingGuide: false, calmMode: false, readingWidth: false },
   motor: { targets: false, focus: false, shortcuts: false, steadyClick: false, largeCursor: false },
-  visual: { fontSize: 16, daltonize: false, highContrast: false, magnifier: false, boldText: false, crosshairs: false, textToSpeech: false, colorPatterns: false }
+  visual: { fontSize: 16, daltonize: false, highContrast: false, magnifier: false, boldText: false, crosshairs: false, textToSpeech: false }
 };
 let guide;
 let shortcutNodes = [];
@@ -20,6 +20,8 @@ let daltonizeSvg;
 let crosshairH, crosshairV;
 let magnifier;
 let speechActiveEl;
+let currentSelectedText = '';
+let isSpeaking = false;
 
 // Catch extension context invalidation globally
 window.addEventListener('error', (event) => {
@@ -66,8 +68,7 @@ function cleanupContext() {
     disableDaltonize();
     disableCrosshairs();
     disableMagnifier();
-    disableTextToSpeech();
-    disableColorPatterns();
+    stopSpeech();
     clearShortcuts();
     if (fontStyleEl) {
       fontStyleEl.textContent = '';
@@ -150,11 +151,11 @@ function applySettings(next) {
 
   // Visual runtime
   applyFontSize(isEnabled ? (v.fontSize || 16) : 16);
+  if (isEnabled && v.highContrast) enableSolarHighContrast(); else disableSolarHighContrast();
   if (isEnabled && v.daltonize) enableDaltonize(); else disableDaltonize();
   if (isEnabled && v.crosshairs) enableCrosshairs(); else disableCrosshairs();
   if (isEnabled && v.magnifier) enableMagnifier(); else disableMagnifier();
-  if (isEnabled && v.textToSpeech) enableTextToSpeech(); else disableTextToSpeech();
-  if (isEnabled && v.colorPatterns) enableColorPatterns(); else disableColorPatterns();
+  if (!isEnabled) stopSpeech();
 
   if (lucentWidgetRoot) {
     if (widgetProfile !== settings.profile) {
@@ -263,6 +264,92 @@ function applyFontSize(size) {
   `;
 }
 
+// Visual: Intelligent Solar High Contrast (Yellow/Black WCAG AAA)
+let solarContrastObserver = null;
+let solarContrastDebounce = null;
+
+function adaptSolarContrastElements() {
+  if (!settings.enabled || !settings.visual?.highContrast) return;
+
+  // 1. Invert dark/transparent logos so they remain crisp and luminous on deep black (Wikipedia/Wikimedia)
+  const logoSelectors = [
+    '.mw-logo-icon',
+    '.mw-logo-wordmark',
+    '.mw-logo-tagline',
+    'img[src*="wikimedia" i]',
+    'img[src*="wikipedia" i]'
+  ].join(',');
+
+  try {
+    document.querySelectorAll(logoSelectors).forEach(el => {
+      if (el.closest('#lucent-widget')) return;
+      el.setAttribute('data-lucent-inverted-logo', 'true');
+    });
+  } catch (e) {}
+
+  // 2. Identify mask-image and icon elements so they receive bright solar yellow instead of black
+  const iconSelectors = [
+    '.vector-icon',
+    '[class*="mw-ui-icon"]',
+    '[class*="vector-icon"]',
+    '[class*="octicon"]',
+    '[class*="mask-icon"]'
+  ].join(',');
+
+  try {
+    document.querySelectorAll(iconSelectors).forEach(el => {
+      if (el.closest('#lucent-widget')) return;
+      el.setAttribute('data-lucent-mask-icon', 'true');
+    });
+  } catch (e) {}
+
+  // Also check elements with CSS mask
+  try {
+    document.querySelectorAll('span[class*="icon" i], i[class*="icon" i], div[class*="icon" i]').forEach(el => {
+      if (el.closest('#lucent-widget') || el.hasAttribute('data-lucent-mask-icon')) return;
+      const mask = window.getComputedStyle(el).webkitMaskImage || window.getComputedStyle(el).maskImage;
+      if (mask && mask !== 'none') {
+        el.setAttribute('data-lucent-mask-icon', 'true');
+      }
+    });
+  } catch (e) {}
+}
+
+function enableSolarHighContrast() {
+  if (isDashboard()) return;
+  ROOT.classList.add('lucent-high-contrast');
+  adaptSolarContrastElements();
+
+  if (!solarContrastObserver) {
+    solarContrastObserver = new MutationObserver(() => {
+      if (solarContrastDebounce) clearTimeout(solarContrastDebounce);
+      solarContrastDebounce = setTimeout(adaptSolarContrastElements, 120);
+    });
+    solarContrastObserver.observe(document.body || document.documentElement, {
+      childList: true,
+      subtree: true
+    });
+  }
+}
+
+function disableSolarHighContrast() {
+  ROOT.classList.remove('lucent-high-contrast');
+  if (solarContrastObserver) {
+    solarContrastObserver.disconnect();
+    solarContrastObserver = null;
+  }
+  if (solarContrastDebounce) {
+    clearTimeout(solarContrastDebounce);
+    solarContrastDebounce = null;
+  }
+  document.querySelectorAll('[data-lucent-inverted-logo]').forEach(el => {
+    el.removeAttribute('data-lucent-inverted-logo');
+  });
+  document.querySelectorAll('[data-lucent-mask-icon]').forEach(el => {
+    el.removeAttribute('data-lucent-mask-icon');
+  });
+}
+
 // Visual: Daltonization spectral shift filter
 function enableDaltonize() {
   if (isDashboard() || daltonizeSvg) return;
@@ -340,7 +427,7 @@ function disableMagnifier() {
   magnifier = undefined;
 }
 
-// Visual: Double-Click to Speech Narrator
+// Visual: Text-to-Speech & Selection Narrator
 function handleSpeechClick(e) {
   if (isDashboard()) return;
   const target = e.target.closest('p, h1, h2, h3, h4, h5, h6, li, article, blockquote, [role="article"]');
@@ -349,26 +436,140 @@ function handleSpeechClick(e) {
   const text = window.getSelection()?.toString().trim() || target.textContent?.trim();
   if (!text || !('speechSynthesis' in window)) return;
 
+  currentSelectedText = text;
+  speakSelectedText(text, target);
+}
+
+function speakSelectedText(customText, targetEl) {
+  if (!('speechSynthesis' in window)) return false;
+
+  if (isSpeaking || window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+    isSpeaking = false;
+    if (speechActiveEl) {
+      speechActiveEl.classList.remove('lucent-speech-active');
+      speechActiveEl = undefined;
+    }
+    updateSpeechButtonUI();
+    return false;
+  }
+
+  const sel = window.getSelection()?.toString().trim();
+  const text = customText || sel || currentSelectedText;
+
+  if (!text) {
+    flashSpeechStatus('Select text first! 👆');
+    return false;
+  }
+
   window.speechSynthesis.cancel();
   if (speechActiveEl) speechActiveEl.classList.remove('lucent-speech-active');
 
-  speechActiveEl = target;
-  target.classList.add('lucent-speech-active');
+  if (targetEl) {
+    speechActiveEl = targetEl;
+    targetEl.classList.add('lucent-speech-active');
+  }
 
-  const utterance = new SpeechSynthesisUtterance(text.slice(0, 500));
+  const utterance = new SpeechSynthesisUtterance(text.slice(0, 1500));
+  utterance.rate = 1.0;
+  utterance.pitch = 1.0;
+
+  utterance.onstart = () => {
+    isSpeaking = true;
+    updateSpeechButtonUI();
+  };
+
   utterance.onend = () => {
-    target.classList.remove('lucent-speech-active');
+    isSpeaking = false;
+    if (speechActiveEl) {
+      speechActiveEl.classList.remove('lucent-speech-active');
+      speechActiveEl = undefined;
+    }
+    updateSpeechButtonUI();
   };
+
   utterance.onerror = () => {
-    target.classList.remove('lucent-speech-active');
+    isSpeaking = false;
+    if (speechActiveEl) {
+      speechActiveEl.classList.remove('lucent-speech-active');
+      speechActiveEl = undefined;
+    }
+    updateSpeechButtonUI();
   };
+
   window.speechSynthesis.speak(utterance);
+  report(`Spoke text: "${text.slice(0, 30)}..."`, 'Visual & Low Vision');
+  return true;
 }
-function enableTextToSpeech() {
-  document.addEventListener('dblclick', handleSpeechClick, true);
+
+function updateSpeechButtonUI() {
+  if (!lucentWidgetRoot) return;
+  const speakBtn = lucentWidgetRoot.querySelector('.widget-speak-btn');
+  const badge = lucentWidgetRoot.querySelector('.speech-status-badge');
+  const preview = lucentWidgetRoot.querySelector('.widget-speech-preview');
+  if (!speakBtn) return;
+
+  const selText = window.getSelection()?.toString().trim() || currentSelectedText;
+
+  if (isSpeaking || window.speechSynthesis?.speaking) {
+    speakBtn.style.background = 'rgba(239, 68, 68, 0.2)';
+    speakBtn.style.color = '#fca5a5';
+    speakBtn.style.borderColor = '#ef4444';
+    speakBtn.innerHTML = '<span>⏹</span> Stop Reading';
+    if (badge) {
+      badge.textContent = 'Reading... 🔊';
+      badge.style.color = '#f87171';
+      badge.style.background = 'rgba(239, 68, 68, 0.2)';
+      badge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+    }
+  } else if (selText) {
+    const words = selText.split(/\s+/).filter(Boolean).length;
+    speakBtn.style.background = '#22c55e';
+    speakBtn.style.color = '#042b12';
+    speakBtn.style.borderColor = '#4ade80';
+    speakBtn.innerHTML = '<span>🔊</span> Read Selected Text';
+    if (badge) {
+      badge.textContent = `${words} word${words === 1 ? '' : 's'}`;
+      badge.style.color = '#4ade80';
+      badge.style.background = 'rgba(34, 197, 94, 0.2)';
+      badge.style.borderColor = 'rgba(74, 222, 128, 0.4)';
+    }
+    if (preview) {
+      preview.style.display = 'block';
+      const snippet = selText.length > 40 ? selText.slice(0, 40) + '...' : selText;
+      preview.textContent = `Selected: "${snippet}"`;
+    }
+  } else {
+    speakBtn.style.background = '#152e20';
+    speakBtn.style.color = '#8df4b5';
+    speakBtn.style.borderColor = '#3c8055';
+    speakBtn.innerHTML = '<span>🔊</span> Read Selected Text';
+    if (badge) {
+      badge.textContent = 'Ready';
+      badge.style.color = '#8bb799';
+      badge.style.background = 'rgba(34, 197, 94, 0.1)';
+      badge.style.borderColor = 'rgba(74, 222, 128, 0.2)';
+    }
+    if (preview) {
+      preview.style.display = 'none';
+    }
+  }
 }
-function disableTextToSpeech() {
-  document.removeEventListener('dblclick', handleSpeechClick, true);
+
+function flashSpeechStatus(msg) {
+  if (!lucentWidgetRoot) return;
+  const badge = lucentWidgetRoot.querySelector('.speech-status-badge');
+  if (!badge) return;
+  badge.textContent = msg;
+  badge.style.color = '#fde047';
+  badge.style.background = 'rgba(234, 179, 8, 0.2)';
+  badge.style.borderColor = '#eab308';
+  setTimeout(() => {
+    updateSpeechButtonUI();
+  }, 2200);
+}
+
+function stopSpeech() {
   if (speechActiveEl) {
     speechActiveEl.classList.remove('lucent-speech-active');
     speechActiveEl = undefined;
@@ -376,33 +577,8 @@ function disableTextToSpeech() {
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
   }
-}
-
-// Visual: Color-to-Pattern Status Icons
-function enableColorPatterns() {
-  if (isDashboard()) return;
-  const statusSelectors = '[class*="status" i], [class*="badge" i], [class*="tag" i], [class*="alert" i], [class*="success" i], [class*="error" i], [class*="warning" i]';
-  document.querySelectorAll(statusSelectors).forEach(el => {
-    if (el.closest('#lucent-widget') || el.dataset.lucentBadge) return;
-    const txt = (el.textContent || '').toLowerCase();
-    const cls = (el.className || '').toLowerCase();
-    if (cls.includes('success') || txt.includes('active') || txt.includes('online') || txt.includes('pass') || txt.includes('completed')) {
-      el.dataset.lucentBadge = '[✓]';
-      el.classList.add('lucent-status-badge-augmented');
-    } else if (cls.includes('error') || cls.includes('danger') || txt.includes('fail') || txt.includes('offline') || txt.includes('error')) {
-      el.dataset.lucentBadge = '[✕]';
-      el.classList.add('lucent-status-badge-augmented');
-    } else if (cls.includes('warn') || txt.includes('pending') || txt.includes('alert')) {
-      el.dataset.lucentBadge = '[!]';
-      el.classList.add('lucent-status-badge-augmented');
-    }
-  });
-}
-function disableColorPatterns() {
-  document.querySelectorAll('.lucent-status-badge-augmented').forEach(el => {
-    el.classList.remove('lucent-status-badge-augmented');
-    delete el.dataset.lucentBadge;
-  });
+  isSpeaking = false;
+  updateSpeechButtonUI();
 }
 
 function assignShortcuts() {
@@ -1086,9 +1262,7 @@ function rebuildWidgetOptions() {
         ['visual.highContrast', 'Solar high-contrast (Yellow/Black)'],
         ['visual.magnifier', 'Hover magnifier loupe'],
         ['visual.boldText', 'Bold typography (18px floor)'],
-        ['visual.crosshairs', 'Cursor crosshairs guide'],
-        ['visual.textToSpeech', 'Double-click to speech'],
-        ['visual.colorPatterns', 'Status & chart patterns']
+        ['visual.crosshairs', 'Cursor crosshairs guide']
       ]
     : [
         ['cognitive.declutter', 'De-clutter'],
@@ -1112,6 +1286,18 @@ function rebuildWidgetOptions() {
           <input type="range" class="widget-font-slider" min="12" max="32" step="1" value="${curSize}" style="flex: 1; accent-color: #22c55e; cursor: pointer; height: 5px;">
           <span style="font-size: 14px; font-weight: 800; color: #8bb799;">32px</span>
         </div>
+      </div>
+      <div class="widget-speech-control" style="background: #112217; border: 1px solid #20442c; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="font-weight: 700; font-size: 12px; color: #ecfff3; display: flex; align-items: center; gap: 5px;">
+            <span>🗣️</span> Text-to-Speech
+          </span>
+          <span class="speech-status-badge" style="font-size: 10px; color: #8bb799; background: rgba(34, 197, 94, 0.15); padding: 1px 7px; border-radius: 999px; border: 1px solid rgba(74, 222, 128, 0.25);">Ready</span>
+        </div>
+        <button type="button" class="widget-speak-btn" style="width: 100%; background: #152e20; color: #8df4b5; border: 1px solid #3c8055; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.15s ease;">
+          <span>🔊</span> Read Selected Text
+        </button>
+        <div class="widget-speech-preview" style="font-size: 10px; color: #7cb28e; margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: none;"></div>
       </div>
     `;
   }
@@ -1154,6 +1340,15 @@ function rebuildWidgetOptions() {
       persistSettings(next);
       report(`Font size scaled to ${val}px`, 'Visual & Low Vision');
     });
+  }
+
+  const speakBtn = optionsContainer.querySelector('.widget-speak-btn');
+  if (speakBtn) {
+    speakBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      speakSelectedText();
+    });
+    updateSpeechButtonUI();
   }
 
   optionsContainer.querySelectorAll('input[data-path]').forEach(input => {
@@ -1303,6 +1498,16 @@ try {
           settings.enabled = true;
           applyFontSize(message.fontSize);
           sendResponse({ success: true });
+          return;
+        }
+        if (message.type === 'LUCENT_SPEAK_SELECTION') {
+          const ok = speakSelectedText(message.text);
+          sendResponse({ success: true, isSpeaking: isSpeaking || ok, text: currentSelectedText });
+          return;
+        }
+        if (message.type === 'LUCENT_GET_SELECTION') {
+          const sel = window.getSelection()?.toString().trim() || currentSelectedText;
+          sendResponse({ text: sel, isSpeaking: isSpeaking || window.speechSynthesis?.speaking || false });
           return;
         }
         if (message.type === 'SCAN_ACCESSIBILITY') {
@@ -1598,6 +1803,24 @@ async function init() {
   // Non-dashboard pages: attach normal accessibility listeners
   document.addEventListener('keydown', handleKeyDown, true);
   document.addEventListener('click', blockRepeatActivation, true);
+  document.addEventListener('selectionchange', () => {
+    if (isDashboard()) return;
+    const sel = window.getSelection();
+    const text = sel ? sel.toString().trim() : '';
+    if (text) {
+      currentSelectedText = text;
+    }
+    updateSpeechButtonUI();
+  });
+  document.addEventListener('mouseup', () => {
+    if (isDashboard()) return;
+    const sel = window.getSelection();
+    const text = sel ? sel.toString().trim() : '';
+    if (text) {
+      currentSelectedText = text;
+      updateSpeechButtonUI();
+    }
+  });
 
   const stored = await safeStorageGet([settingsKey, 'lucentEvents']);
   if (!stored || !isExtensionValid()) return;

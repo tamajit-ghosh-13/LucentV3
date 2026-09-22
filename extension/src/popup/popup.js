@@ -4,7 +4,7 @@ const defaults = {
   profile: 'cognitive',
   cognitive: { declutter: false, dyslexia: false, readingGuide: false, calmMode: false, readingWidth: false },
   motor: { targets: false, focus: false, shortcuts: false, steadyClick: true, largeCursor: false },
-  visual: { fontSize: 16, daltonize: false, highContrast: false, magnifier: false, boldText: false, crosshairs: false, textToSpeech: false, colorPatterns: false }
+  visual: { fontSize: 16, daltonize: false, highContrast: false, magnifier: false, boldText: false, crosshairs: false, textToSpeech: false }
 };
 
 let settings = { ...defaults };
@@ -263,4 +263,74 @@ document.querySelector('#open-dashboard')?.addEventListener('click', (e) => {
     }
   });
 });
+
+// Speech Controller (Read Selected Text)
+const popupSpeakBtn = document.getElementById('popup-speak-btn');
+const popupSpeechBadge = document.getElementById('popup-speech-badge');
+const popupSpeechPreview = document.getElementById('popup-speech-preview');
+
+function updatePopupSpeechUI(isSpeaking, text) {
+  if (!popupSpeakBtn) return;
+  if (isSpeaking) {
+    popupSpeakBtn.style.background = 'rgba(239, 68, 68, 0.25)';
+    popupSpeakBtn.style.color = '#fca5a5';
+    popupSpeakBtn.style.borderColor = '#ef4444';
+    popupSpeakBtn.innerHTML = '<span>⏹</span> Stop Reading';
+    if (popupSpeechBadge) {
+      popupSpeechBadge.textContent = 'Speaking... 🔊';
+      popupSpeechBadge.style.color = '#f87171';
+      popupSpeechBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+    }
+  } else if (text) {
+    const words = text.split(/\s+/).filter(Boolean).length;
+    popupSpeakBtn.style.background = '#22c55e';
+    popupSpeakBtn.style.color = '#042b12';
+    popupSpeakBtn.style.borderColor = '#4ade80';
+    popupSpeakBtn.innerHTML = '<span>🔊</span> Read Selected Text';
+    if (popupSpeechBadge) {
+      popupSpeechBadge.textContent = `${words} word${words === 1 ? '' : 's'}`;
+      popupSpeechBadge.style.color = '#4ade80';
+      popupSpeechBadge.style.background = 'rgba(34, 197, 94, 0.2)';
+    }
+    if (popupSpeechPreview) {
+      popupSpeechPreview.style.display = 'block';
+      const snippet = text.length > 36 ? text.slice(0, 36) + '...' : text;
+      popupSpeechPreview.textContent = `Selected: "${snippet}"`;
+    }
+  } else {
+    popupSpeakBtn.style.background = '#1d3d2b';
+    popupSpeakBtn.style.color = '#8df4b5';
+    popupSpeakBtn.style.borderColor = '#3c8055';
+    popupSpeakBtn.innerHTML = '<span>🔊</span> Read Selected Text';
+    if (popupSpeechBadge) {
+      popupSpeechBadge.textContent = 'Ready';
+      popupSpeechBadge.style.color = '#8bb799';
+      popupSpeechBadge.style.background = 'rgba(34, 197, 94, 0.15)';
+    }
+    if (popupSpeechPreview) {
+      popupSpeechPreview.style.display = 'none';
+    }
+  }
+}
+
+if (popupSpeakBtn) {
+  popupSpeakBtn.addEventListener('click', async () => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      chrome.tabs.sendMessage(tab.id, { type: 'LUCENT_SPEAK_SELECTION' }, response => {
+        if (chrome.runtime.lastError) return;
+        updatePopupSpeechUI(response?.isSpeaking, response?.text);
+      });
+    }
+  });
+
+  chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+    if (tab?.id) {
+      chrome.tabs.sendMessage(tab.id, { type: 'LUCENT_GET_SELECTION' }, response => {
+        if (chrome.runtime.lastError) return;
+        updatePopupSpeechUI(response?.isSpeaking, response?.text);
+      });
+    }
+  });
+}
 

@@ -135,7 +135,6 @@ export default function Dashboard() {
         daltonize: true,
         highContrast: true,
         boldText: true,
-        colorPatterns: true,
         magnifier: false,
         crosshairs: false,
         textToSpeech: false
@@ -146,8 +145,7 @@ export default function Dashboard() {
         boldText: false,
         magnifier: false,
         crosshairs: false,
-        textToSpeech: false,
-        colorPatterns: false
+        textToSpeech: false
       }
     });
   };
@@ -772,12 +770,6 @@ export default function Dashboard() {
                 description="Reads aloud clicked paragraphs or selected text via Web Speech Synthesis."
                 active={settings.visual.textToSpeech}
                 onToggle={() => toggleVisual('textToSpeech')}
-              />
-              <FeatureCard
-                title="Color-to-Pattern Overlays"
-                description="Adds textured hatches and status badges so meaning is never communicated by color alone."
-                active={settings.visual.colorPatterns}
-                onToggle={() => toggleVisual('colorPatterns')}
               />
             </div>
           )}

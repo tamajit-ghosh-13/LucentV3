@@ -9,7 +9,7 @@ export type VisualAdaptations = {
   boldText: boolean;
   crosshairs: boolean;
   textToSpeech: boolean;
-  colorPatterns: boolean;
+  colorPatterns?: boolean;
 };
 
 export type LucentSettings = {
@@ -51,7 +51,7 @@ export const defaults: LucentSettings = {
   profile: 'raw',
   cognitive: { declutter: false, dyslexia: false, readingGuide: false, calmMode: false, readingWidth: false },
   motor: { targets: false, focus: false, shortcuts: false, steadyClick: true, largeCursor: false },
-  visual: { fontSize: 16, daltonize: false, highContrast: false, magnifier: false, boldText: false, crosshairs: false, textToSpeech: false, colorPatterns: false }
+  visual: { fontSize: 16, daltonize: false, highContrast: false, magnifier: false, boldText: false, crosshairs: false, textToSpeech: false }
 };
 function parse<T>(key: string, fallback: T): T { try { return JSON.parse(localStorage.getItem(key) || '') as T; } catch { return fallback; } }
 function normalized(value: Partial<LucentSettings>): LucentSettings {

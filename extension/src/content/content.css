@@ -165,39 +165,375 @@ html.lucent-large-cursor * {
    VISUAL IMPAIRMENT & LOW VISION STYLES
    ===================================================== */
 
-/* Solar Yellow-on-Black High Contrast */
+/* Intelligent Solar High-Contrast Suite (WCAG AAA Yellow-on-Black) */
 html.lucent-high-contrast,
 html.lucent-high-contrast body {
   background-color: #000000 !important;
   color: #ffff00 !important;
 }
 
-html.lucent-high-contrast *:not(#lucent-widget):not(#lucent-widget *):not(svg):not(path):not(img):not(video) {
+/* 1. Deep OLED Canvas for Structural Layout Containers */
+html.lucent-high-contrast body,
+html.lucent-high-contrast main,
+html.lucent-high-contrast article,
+html.lucent-high-contrast section,
+html.lucent-high-contrast nav,
+html.lucent-high-contrast header,
+html.lucent-high-contrast footer,
+html.lucent-high-contrast aside,
+html.lucent-high-contrast [role="main"],
+html.lucent-high-contrast [role="region"],
+html.lucent-high-contrast [role="article"],
+html.lucent-high-contrast .mw-page-container,
+html.lucent-high-contrast .mw-body,
+html.lucent-high-contrast #content,
+html.lucent-high-contrast .vector-header-container,
+html.lucent-high-contrast .vector-sticky-header,
+html.lucent-high-contrast #mw-panel,
+html.lucent-high-contrast #mw-content-text {
   background-color: #000000 !important;
   color: #ffff00 !important;
-  border-color: #555500 !important;
-  box-shadow: none !important;
   text-shadow: none !important;
+  box-shadow: none !important;
 }
 
+/* Overlay & Backdrop Safety: Transparent overlays must NEVER blackout the page */
+html.lucent-high-contrast [style*="pointer-events: none"],
+html.lucent-high-contrast .sfbg,
+html.lucent-high-contrast .sfbgg,
+html.lucent-high-contrast .UUbT9,
+html.lucent-high-contrast .appbar,
+html.lucent-high-contrast [class*="backdrop" i]:not([role="dialog"]),
+html.lucent-high-contrast [class*="overlay" i]:not([role="dialog"]):not(.lucent-reading-guide) {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* 2. Text & Typography Readability */
+html.lucent-high-contrast p,
+html.lucent-high-contrast li,
+html.lucent-high-contrast dt,
+html.lucent-high-contrast dd,
+html.lucent-high-contrast em,
+html.lucent-high-contrast strong,
+html.lucent-high-contrast b,
+html.lucent-high-contrast blockquote,
+html.lucent-high-contrast label:not(#lucent-widget *),
+html.lucent-high-contrast span:not(#lucent-widget *):not(a *):not(button *):not([data-lucent-mask-icon]):not([class*="icon"]),
+html.lucent-high-contrast [data-snippet],
+html.lucent-high-contrast .VwiC3b,
+html.lucent-high-contrast .s3v9rd {
+  color: #ffff00 !important;
+}
+
+/* Headings in Radiant Warm Gold */
+html.lucent-high-contrast h1,
+html.lucent-high-contrast h2,
+html.lucent-high-contrast h3,
+html.lucent-high-contrast h4,
+html.lucent-high-contrast h5,
+html.lucent-high-contrast h6,
+html.lucent-high-contrast [role="heading"],
+html.lucent-high-contrast .LC20lb {
+  color: #ffd700 !important;
+  border-bottom-color: #444400 !important;
+  font-weight: 700 !important;
+}
+
+/* 3. Radiant WCAG AAA Hyperlinks (Sky Blue with clear underlines) */
 html.lucent-high-contrast a:not(#lucent-widget *),
-html.lucent-high-contrast a *:not(#lucent-widget *) {
+html.lucent-high-contrast a:not(#lucent-widget *) *,
+html.lucent-high-contrast [role="link"]:not(#lucent-widget *),
+html.lucent-high-contrast [role="link"]:not(#lucent-widget *) * {
   color: #38bdf8 !important;
+  text-decoration: underline !important;
+  text-decoration-thickness: 1.5px !important;
+  text-underline-offset: 3px !important;
+}
+
+html.lucent-high-contrast a:not(#lucent-widget *):hover,
+html.lucent-high-contrast a:not(#lucent-widget *):hover * {
+  color: #7dd3fc !important;
   text-decoration: underline !important;
 }
 
-html.lucent-high-contrast button:not(#lucent-widget *),
-html.lucent-high-contrast input:not(#lucent-widget *),
-html.lucent-high-contrast select:not(#lucent-widget *),
-html.lucent-high-contrast textarea:not(#lucent-widget *) {
-  background-color: #121212 !important;
-  color: #ffff00 !important;
-  border: 2px solid #ffff00 !important;
+html.lucent-high-contrast a:not(#lucent-widget *):visited,
+html.lucent-high-contrast a:not(#lucent-widget *):visited * {
+  color: #c084fc !important;
 }
 
-html.lucent-high-contrast img,
+/* Citations & Breadcrumbs in Lime Green */
+html.lucent-high-contrast cite,
+html.lucent-high-contrast .byrV5b,
+html.lucent-high-contrast .TbwUpd {
+  color: #a3e635 !important;
+  text-decoration: none !important;
+}
+
+/* 4. Elimination of Wireframe Boxes: Strictly Scope Borders */
+/* ONLY genuine bordered elements get high-contrast borders */
+html.lucent-high-contrast table,
+html.lucent-high-contrast th,
+html.lucent-high-contrast td,
+html.lucent-high-contrast hr,
+html.lucent-high-contrast pre,
+html.lucent-high-contrast code,
+html.lucent-high-contrast blockquote,
+html.lucent-high-contrast fieldset {
+  border-color: #555500 !important;
+}
+
+/* Force transparent layout elements to STAY transparent (Fixes TOC boxes) */
+html.lucent-high-contrast .vector-toc-link,
+html.lucent-high-contrast .vector-toc-list-item,
+html.lucent-high-contrast [class*="toc-link"],
+html.lucent-high-contrast nav a,
+html.lucent-high-contrast nav li,
+html.lucent-high-contrast ul:not(table *) > li,
+html.lucent-high-contrast ol:not(table *) > li {
+  border-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Clean accessible active indicator for TOC links */
+html.lucent-high-contrast .vector-toc-link:hover,
+html.lucent-high-contrast .vector-toc-list-item-active > .vector-toc-link {
+  background-color: #181818 !important;
+  border-left: 3px solid #ffd700 !important;
+  border-radius: 4px !important;
+  color: #ffffff !important;
+}
+
+/* Neutralize white fade-out gradient overlays (e.g. Wikipedia TOC bottom) */
+html.lucent-high-contrast .vector-toc::after,
+html.lucent-high-contrast [class*="fade-out"],
+html.lucent-high-contrast [class*="gradient-fade"],
+html.lucent-high-contrast [class*="gradient-overlay"] {
+  display: none !important;
+  background: none !important;
+}
+
+/* 5. Intelligent CSS Mask Icons & SVG Visibility (Hamburger, Search, Tools) */
+html.lucent-high-contrast [data-lucent-mask-icon="true"],
+html.lucent-high-contrast .vector-icon,
+html.lucent-high-contrast [class*="mw-ui-icon"],
+html.lucent-high-contrast [class*="vector-icon"],
+html.lucent-high-contrast [class*="octicon"] {
+  background-color: #ffff00 !important;
+}
+
+html.lucent-high-contrast a [data-lucent-mask-icon="true"],
+html.lucent-high-contrast a .vector-icon,
+html.lucent-high-contrast a [class*="mw-ui-icon"],
+html.lucent-high-contrast a [class*="vector-icon"] {
+  background-color: #38bdf8 !important;
+}
+
+html.lucent-high-contrast svg:not(#lucent-widget *):not([role="img"]) {
+  fill: currentColor !important;
+}
+
+html.lucent-high-contrast svg:not(#lucent-widget *):not([role="img"]) path,
+html.lucent-high-contrast svg:not(#lucent-widget *):not([role="img"]) circle,
+html.lucent-high-contrast svg:not(#lucent-widget *):not([role="img"]) rect,
+html.lucent-high-contrast svg:not(#lucent-widget *):not([role="img"]) polygon {
+  fill: currentColor !important;
+}
+
+/* 6. Dark Transparent Logo Inversion (Fixes blacked-out Wikipedia globe & brand logos) */
+html.lucent-high-contrast .mw-logo-icon,
+html.lucent-high-contrast .mw-logo-wordmark,
+html.lucent-high-contrast .mw-logo-tagline,
+html.lucent-high-contrast img[src*="wikipedia" i],
+html.lucent-high-contrast img[src*="wikimedia" i],
+html.lucent-high-contrast [data-lucent-inverted-logo="true"] {
+  filter: invert(1) hue-rotate(180deg) brightness(1.25) contrast(1.15) !important;
+}
+
+/* Keep standard photos natural */
+html.lucent-high-contrast img:not([data-lucent-inverted-logo="true"]):not(.mw-logo-icon):not([src*="wikipedia"]):not([src*="wikimedia"]),
 html.lucent-high-contrast video {
-  filter: brightness(0.9) contrast(1.15) !important;
+  filter: brightness(0.95) contrast(1.1) !important;
+}
+
+/* 7. Structural Card & Surface Preservation (Infoboxes & Alert Banners) */
+html.lucent-high-contrast .infobox,
+html.lucent-high-contrast table.infobox,
+html.lucent-high-contrast .navbox,
+html.lucent-high-contrast [class*="infobox"] {
+  background-color: #0c0e12 !important;
+  border: 1px solid #555500 !important;
+}
+
+html.lucent-high-contrast .infobox th,
+html.lucent-high-contrast .infobox .infobox-above,
+html.lucent-high-contrast .infobox .infobox-header {
+  background-color: #171b22 !important;
+  color: #ffd700 !important;
+  border: 1px solid #444400 !important;
+}
+
+html.lucent-high-contrast .infobox td {
+  background-color: #0c0e12 !important;
+  border: 1px solid #282800 !important;
+}
+
+/* Warning & Citation Banners (e.g. Wikipedia .ambox) */
+html.lucent-high-contrast .ambox,
+html.lucent-high-contrast [role="alert"],
+html.lucent-high-contrast .notice,
+html.lucent-high-contrast .warning {
+  background-color: #141100 !important;
+  border-left: 6px solid #ffd700 !important;
+  border-top: 1px solid #332d00 !important;
+  border-right: 1px solid #332d00 !important;
+  border-bottom: 1px solid #332d00 !important;
+  border-radius: 4px !important;
+}
+
+/* 8. Interactive Form Controls, Buttons & Search Engine Optimizations */
+
+/* Text inputs, search inputs, textareas */
+html.lucent-high-contrast input[type="text"]:not(#lucent-widget *),
+html.lucent-high-contrast input[type="search"]:not(#lucent-widget *),
+html.lucent-high-contrast input[type="email"]:not(#lucent-widget *),
+html.lucent-high-contrast input[type="password"]:not(#lucent-widget *),
+html.lucent-high-contrast input[type="number"]:not(#lucent-widget *),
+html.lucent-high-contrast input[type="tel"]:not(#lucent-widget *),
+html.lucent-high-contrast input[type="url"]:not(#lucent-widget *),
+html.lucent-high-contrast select:not(#lucent-widget *),
+html.lucent-high-contrast textarea:not(#lucent-widget *) {
+  background-color: #121214 !important;
+  color: #ffff00 !important;
+  border: 1px solid #555500 !important;
+  border-radius: 6px !important;
+}
+
+/* Standard clickable action and submit buttons */
+html.lucent-high-contrast button:not(#lucent-widget *),
+html.lucent-high-contrast input[type="submit"]:not(#lucent-widget *),
+html.lucent-high-contrast input[type="button"]:not(#lucent-widget *) {
+  background-color: #1a1a1d !important;
+  color: #ffff00 !important;
+  border: 1px solid #555500 !important;
+  border-radius: 6px !important;
+}
+
+/* Icon-only and toolbar buttons: ELIMINATE WIREFRAME BOXES! (Google G logo, menu, edit, mic, lens, apps) */
+html.lucent-high-contrast button:not(#lucent-widget *):has(svg),
+html.lucent-high-contrast button:not(#lucent-widget *):has(img),
+html.lucent-high-contrast button:not(#lucent-widget *)[aria-label]:not(:has(span:not([class*="icon"]))),
+html.lucent-high-contrast [role="button"]:has(svg),
+html.lucent-high-contrast [role="button"]:has(img),
+html.lucent-high-contrast button[class*="icon" i],
+html.lucent-high-contrast [role="button"][class*="icon" i],
+html.lucent-high-contrast button.M6CB1c,
+html.lucent-high-contrast button.F1akfd,
+html.lucent-high-contrast .gb_d,
+html.lucent-high-contrast .gb_e,
+html.lucent-high-contrast .gb_f,
+html.lucent-high-contrast .iblpc:has(svg) {
+  border: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Button & control focus/hover accessibility feedback */
+html.lucent-high-contrast button:not(#lucent-widget *):hover,
+html.lucent-high-contrast input[type="submit"]:hover,
+html.lucent-high-contrast input[type="button"]:hover,
+html.lucent-high-contrast [role="button"]:not(#lucent-widget *):hover {
+  background-color: rgba(255, 255, 0, 0.15) !important;
+  color: #ffffff !important;
+  cursor: pointer !important;
+}
+
+html.lucent-high-contrast input:not(#lucent-widget *):focus,
+html.lucent-high-contrast select:not(#lucent-widget *):focus,
+html.lucent-high-contrast textarea:not(#lucent-widget *):focus,
+html.lucent-high-contrast button:not(#lucent-widget *):focus-visible,
+html.lucent-high-contrast [role="button"]:not(#lucent-widget *):focus-visible {
+  outline: 2px solid #38bdf8 !important;
+  outline-offset: 2px !important;
+}
+
+/* Interactive Chips, Suggestion Pills & Filter Buttons (e.g. AI Prompt pills, Overview) */
+html.lucent-high-contrast [role="button"][class*="chip" i],
+html.lucent-high-contrast [role="button"][class*="pill" i],
+html.lucent-high-contrast button[class*="chip" i],
+html.lucent-high-contrast button[class*="pill" i],
+html.lucent-high-contrast .iblpc {
+  background-color: #121417 !important;
+  color: #ffd700 !important;
+  border: 1px solid #555500 !important;
+  border-radius: 9999px !important;
+}
+
+/* Google Search Input Bar: Seamless high-contrast pill */
+html.lucent-high-contrast .RNNXgb,
+html.lucent-high-contrast [role="search"] form,
+html.lucent-high-contrast form[role="search"] {
+  background-color: #161618 !important;
+  border: 1.5px solid #ffd700 !important;
+  border-radius: 24px !important;
+  box-shadow: none !important;
+}
+
+html.lucent-high-contrast textarea[name="q"],
+html.lucent-high-contrast input[name="q"],
+html.lucent-high-contrast .gLFyf {
+  background-color: transparent !important;
+  color: #ffff00 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Google Search Navigation Bar (All, Images, Videos, Shopping, More) */
+html.lucent-high-contrast .hdtb-mitem a,
+html.lucent-high-contrast [role="navigation"] a:not([class*="btn"]):not([role="button"]),
+html.lucent-high-contrast [role="tab"] {
+  color: #ffff00 !important;
+  text-decoration: none !important;
+  border: none !important;
+}
+
+html.lucent-high-contrast .hdtb-mitem a:hover,
+html.lucent-high-contrast [role="tab"]:hover,
+html.lucent-high-contrast [role="tab"][aria-selected="true"] {
+  color: #38bdf8 !important;
+  border-bottom: 2px solid #ffd700 !important;
+}
+
+/* Google Search Cards, Knowledge Panels & AI Overview Containers */
+html.lucent-high-contrast .xpdopen,
+html.lucent-high-contrast .kp-blk,
+html.lucent-high-contrast g-inner-card,
+html.lucent-high-contrast .G920zb,
+html.lucent-high-contrast [data-attrid],
+html.lucent-high-contrast .MjjYud {
+  background-color: #0d0f12 !important;
+  border-color: #333300 !important;
+}
+
+/* Clean Sidebar Separation without Neon Yellow Borders */
+html.lucent-high-contrast aside,
+html.lucent-high-contrast [role="complementary"],
+html.lucent-high-contrast [class*="sidebar" i],
+html.lucent-high-contrast [class*="left-rail" i] {
+  background-color: #0c0c0e !important;
+  border-color: #2a2a00 !important;
+}
+
+/* Ensure Google and Card Thumbnails Stay Crisp */
+html.lucent-high-contrast g-img img,
+html.lucent-high-contrast .uhHOwf img,
+html.lucent-high-contrast .mJ3Ukc img,
+html.lucent-high-contrast .YQ4gaf {
+  filter: contrast(1.05) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 /* Real-time Typography Scaling Controller */
@@ -283,16 +619,6 @@ html.lucent-bold-text div {
   outline: 3px solid #eab308 !important;
   outline-offset: 2px !important;
   border-radius: 4px !important;
-}
-
-/* Color-to-Pattern Status Icons */
-.lucent-status-badge-augmented {
-  position: relative !important;
-}
-.lucent-status-badge-augmented::before {
-  content: attr(data-lucent-badge) ' ';
-  font-weight: 800 !important;
-  margin-right: 4px !important;
 }
 
 /* Gemini AI Auto-Remediation Hitbox & Feedback */

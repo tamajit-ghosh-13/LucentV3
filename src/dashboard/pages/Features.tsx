@@ -191,14 +191,6 @@ const disorderGroups: DisorderGroup[] = [
         category: 'Auditory Augmentation',
         benefit: 'Relieves severe eye strain and provides instant reading reinforcement',
         howItWorks: 'Native Web Speech API integration triggered by click or keyboard focus'
-      },
-      {
-        id: 'vis-8',
-        name: 'Color-to-Pattern Texture & Status Reinforcement',
-        description: 'Injects distinct geometric hatching (stripes, dots, cross-hatch) onto solid-colored chart bars and pie slices, and appends explicit glyphs ([✓], [!], [✕]) to color-only status badges.',
-        category: 'Visual Disambiguation',
-        benefit: 'Ensures critical form errors and data graphs never rely exclusively on color',
-        howItWorks: 'Injects SVG texture patterns and symbolic text markers onto colored nodes'
       }
     ]
   }
