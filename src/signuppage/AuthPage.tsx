@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Eye,
   Brain,
   MousePointer,
   Sparkles,
@@ -20,7 +19,7 @@ import { AccessibilityProfile } from '../types';
 import { signUpUser, signInUser, signInWithGoogle } from '../lib/supabase';
 
 interface AuthPageProps {
-  onAuthSuccess: (profile: AccessibilityProfile, userEmail?: string) => void;
+  onAuthSuccess: (profile: AccessibilityProfile, userEmail?: string, name?: string) => void;
   onContinueAsGuest: (profile: AccessibilityProfile) => void;
 }
 
@@ -28,22 +27,12 @@ const DISABILITY_PROFILES: {
   id: AccessibilityProfile;
   label: string;
   category: string;
-  icon: typeof Eye;
+  icon: typeof Brain;
   color: string;
   badgeBg: string;
   description: string;
   features: string[];
 }[] = [
-    {
-      id: 'visual',
-      label: 'Visual Impairment',
-      category: 'Low Vision, Color Blindness & Cataracts',
-      icon: Eye,
-      color: 'text-purple-400',
-      badgeBg: 'bg-purple-500/10 border-purple-500/30 text-purple-300',
-      description: 'Enforces high-contrast themes, 125% font reflow, and runs Gemini AI Vision to label missing icons and complex graphics.',
-      features: ['WCAG AAA High Contrast (Yellow/Black)', '125% Dynamic Text Scaling', 'Gemini AI Image & Icon Descriptions', 'Screen Magnifier']
-    },
     {
       id: 'cognitive',
       label: 'Cognitive & ADHD Support',
@@ -81,7 +70,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   onContinueAsGuest
 }) => {
   const [mode, setMode] = useState<'signup' | 'signin'>('signup');
-  const [selectedDisability, setSelectedDisability] = useState<AccessibilityProfile>('visual');
+  // Visual impairment is intentionally reserved for Tamajit's pipeline.
+  const [selectedDisability, setSelectedDisability] = useState<AccessibilityProfile>('cognitive');
 
   // Form fields
   const [fullName, setFullName] = useState('');
@@ -119,13 +109,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         await signUpUser(email, password, fullName, selectedDisability);
         setSuccessMsg('Account created successfully! Profile saved.');
         setTimeout(() => {
-          onAuthSuccess(selectedDisability, email);
+          onAuthSuccess(selectedDisability, email, fullName);
         }, 800);
       } else {
         await signInUser(email, password);
         setSuccessMsg('Signed in successfully! Loading your accessibility profile...');
         setTimeout(() => {
-          onAuthSuccess(selectedDisability, email);
+          onAuthSuccess(selectedDisability, email, email.split('@')[0]);
         }, 800);
       }
     } catch (err: any) {
@@ -134,7 +124,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       if (err?.message?.includes('FetchError') || err?.message?.includes('placeholder') || err?.status === 400) {
         setErrorMsg(`${err.message || 'Auth error'}. Entering demo mode with selected profile.`);
         setTimeout(() => {
-          onAuthSuccess(selectedDisability, email || 'demo@lucent.ai');
+          onAuthSuccess(selectedDisability, email || 'demo@lucent.ai', fullName || 'Demo user');
         }, 1200);
       } else {
         setErrorMsg(err.message || 'Authentication failed. Please check your credentials.');
@@ -158,7 +148,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       if (err?.message?.includes('provider') || err?.message?.includes('placeholder') || err?.message?.includes('FetchError') || err?.status === 400) {
         setSuccessMsg('Google OAuth initialized! Signing in with Google Account (Demo Mode)...');
         setTimeout(() => {
-          onAuthSuccess(selectedDisability, 'google.user@gmail.com');
+          onAuthSuccess(selectedDisability, 'google.user@gmail.com', 'Google user');
         }, 1000);
       } else {
         setErrorMsg(err.message || 'Google Sign-In failed.');

@@ -1,67 +1,11 @@
-const btnScan = document.getElementById("btn-scan");
-const btnReinforce = document.getElementById("btn-reinforce");
-const resultsDiv = document.getElementById("results");
-
-const elTotal = document.getElementById("total-issues");
-const elTargets = document.getElementById("count-targets");
-const elUnlabeled = document.getElementById("count-unlabeled");
-const elContrast = document.getElementById("count-contrast");
-const elImages = document.getElementById("count-images");
-
-btnScan.addEventListener("click", async () => {
-    btnScan.textContent = "Scanning...";
-    btnScan.disabled = true;
-
-    // Send message to content script in the active tab
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    
-    chrome.tabs.sendMessage(tab.id, { type: "SCAN_ACCESSIBILITY" }, (response) => {
-        btnScan.textContent = "Re-Scan Page";
-        btnScan.disabled = false;
-        
-        if (response && response.results) {
-            displayResults(response.results);
-        } else {
-            alert("Could not scan page. Ensure you are on a valid webpage (not a chrome:// URL) and try refreshing the tab.");
-        }
-    });
-});
-
-btnReinforce.addEventListener("click", async () => {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    chrome.tabs.sendMessage(tab.id, { type: "REINFORCE_ACCESSIBILITY" }, () => {
-        btnReinforce.textContent = "✅ Issues Fixed";
-        btnReinforce.disabled = true;
-        btnReinforce.style.backgroundColor = "#059669";
-        
-        // Update results to show 0
-        displayResults({
-            smallTargets: 0,
-            unlabeledButtons: 0,
-            lowContrast: 0,
-            missingAlt: 0,
-            total: 0
-        });
-    });
-});
-
-function displayResults(data) {
-    resultsDiv.style.display = "flex";
-    
-    elTotal.textContent = `${data.total} issue${data.total !== 1 ? 's' : ''} found`;
-    elTotal.style.color = data.total > 0 ? "#f87171" : "#10b981"; // Red if issues, green if none
-
-    elTargets.textContent = data.smallTargets;
-    elUnlabeled.textContent = data.unlabeledButtons;
-    elContrast.textContent = data.lowContrast;
-    elImages.textContent = data.missingAlt;
-    
-    if (data.total > 0) {
-        btnReinforce.style.display = "block";
-        btnReinforce.textContent = "✨ Fix Issues Automatically";
-        btnReinforce.disabled = false;
-        btnReinforce.style.backgroundColor = "#10b981";
-    } else {
-        btnReinforce.style.display = "none";
-    }
-}
+const key = 'lucentSettings';
+const defaults = { enabled: false, cognitive: { declutter: false, dyslexia: false, readingGuide: false, calmMode: false }, motor: { targets: false, focus: false, shortcuts: false, steadyClick: true } };
+let settings;
+const master = document.querySelector('#master'); const status = document.querySelector('#status');
+function setPath(path, value) { const [group, name] = path.split('.'); settings[group][name] = value; }
+function render() { master.textContent = settings.enabled ? 'ON' : 'OFF'; master.classList.toggle('on', settings.enabled); document.querySelectorAll('[data-path]').forEach(input => { const [group,name]=input.dataset.path.split('.'); input.checked=!!settings[group][name]; input.disabled=!settings.enabled; }); }
+async function apply() { await chrome.storage.local.set({ [key]: settings }); const [tab] = await chrome.tabs.query({ active:true,currentWindow:true }); if (tab?.id) chrome.tabs.sendMessage(tab.id,{type:'LUCENT_SETTINGS',settings},()=>void chrome.runtime.lastError); chrome.runtime.sendMessage({type:'TOGGLE_EXTENSION',enabled:settings.enabled}); status.textContent=settings.enabled?'Adaptations are active on this tab.':'Lucent is paused.'; render(); }
+chrome.storage.local.get(key, stored => { settings = { ...defaults, ...(stored[key] || {}), cognitive:{...defaults.cognitive,...(stored[key]?.cognitive || {})}, motor:{...defaults.motor,...(stored[key]?.motor || {})} }; render(); });
+master.addEventListener('click',()=>{settings.enabled=!settings.enabled;apply();});
+document.querySelectorAll('[data-path]').forEach(input=>input.addEventListener('change',event=>{setPath(event.target.dataset.path,event.target.checked);apply();}));
+document.querySelector('#btn-scan').addEventListener('click',async event=>{const [tab]=await chrome.tabs.query({active:true,currentWindow:true}); chrome.tabs.sendMessage(tab.id,{type:'SCAN_ACCESSIBILITY'},response=>{event.target.textContent=response?.results?`${response.results.total} issues found`:'Scan unavailable';});});

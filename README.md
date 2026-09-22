@@ -39,6 +39,21 @@
 
 ## 📋 Table of Contents
 
+## Local launch and Chrome connection
+
+```bash
+npm ci
+npm run dev
+```
+
+Open `http://localhost:3000`, sign in or enter as a guest, choose either **Cognitive & ADHD** or **Motor & Tremor** support, and use the dashboard to enable just the features required.
+
+To connect the real Chrome extension, open `chrome://extensions`, turn on **Developer mode**, choose **Load unpacked**, and select this repository's `extension` folder. Reload the Lucent dashboard. A Connected status means dashboard changes are being applied to Chrome immediately; browser events are shown in Live activity.
+
+For a production Supabase deployment, run [supabase/schema.sql](supabase/schema.sql) in the Supabase SQL Editor, configure OAuth/email providers in Supabase Auth, then add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` to the deployment environment. Never commit `.env.local`.
+
+The visual-impairment extension pipeline remains reserved for Tamajit.
+
 - [The Crisis: Why This Exists](#-the-crisis-why-this-exists)
 - [The Paradigm Inversion](#-the-paradigm-inversion)
 - [The Five-Stage Autonomous Pipeline](#-the-five-stage-autonomous-pipeline)
