@@ -421,7 +421,7 @@ export default function Dashboard() {
               <Bot size={18} style={{ color: '#4ade80' }} />
               Gemini AI Accessibility Auditor &amp; Auto-Remediator
             </h2>
-            <p>Real-time deep semantic DOM analysis powered by Google Gemini 3.6 Flash</p>
+            <p>Real-time deep semantic DOM analysis powered by Google Gemini 1.5 Flash</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ 
@@ -436,7 +436,7 @@ export default function Dashboard() {
               border: '1px solid rgba(74, 222, 128, 0.25)',
               fontWeight: 600 
             }}>
-              <Sparkles size={12} /> Gemini 3.6 Flash
+              <Sparkles size={12} /> Gemini 1.5 Flash
             </span>
             <button
               type="button"
@@ -584,7 +584,7 @@ export default function Dashboard() {
                 Automated AI Accessibility Scanner Ready
               </h3>
               <p style={{ fontSize: 12, color: '#8ab498', maxWidth: 440, margin: '0 auto 14px' }}>
-                Run an instant audit using Google Gemini 3.6 Flash to identify unlabelled interactive buttons, missing image alts, tiny hitboxes, and contrast violations.
+                Run an instant audit using Google Gemini 1.5 Flash to identify unlabelled interactive buttons, missing image alts, tiny hitboxes, and contrast violations.
               </p>
               <button
                 type="button"

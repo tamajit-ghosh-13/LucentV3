@@ -94,7 +94,7 @@ Return strictly valid JSON with the following structure (no markdown fences, no 
 `;
 
     const response = await client.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-1.5-flash',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -117,16 +117,97 @@ Return strictly valid JSON with the following structure (no markdown fences, no 
 }
 
 /**
+/**
+ * Extracts key sentences from text as an instant, zero-latency local heuristic fallback.
+ */
+export function generateLocalBulletPoints(text: string): string[] {
+  const sentences = text
+    .split(/(?<=[.?!])\s+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 20);
+  if (sentences.length <= 2) {
+    return sentences.length > 0 ? sentences : [text.slice(0, 120)];
+  }
+  return [sentences[0], sentences[Math.floor(sentences.length / 2)], sentences[sentences.length - 1]].slice(0, 3);
+}
+
+/**
  * Simplifies complex, dense text into plain-language bullet points for Cognitive & ADHD mode.
+ * Supports both single string input and batch paragraphs { paragraphs: string[] }.
  */
 export async function simplifyTextWithGemini(
-  complexText: string
-): Promise<{ simplifiedText: string; readingTimeSavedMinutes: number }> {
+  input: string | { text?: string; paragraphs?: string[] }
+): Promise<{
+  simplifiedText?: string;
+  simplifiedParagraphs?: string[][];
+  readingTimeSavedMinutes: number;
+}> {
   const client = getGeminiClient();
 
-  if (!client || !complexText.trim()) {
+  const isBatch = typeof input === 'object' && Array.isArray(input?.paragraphs) && input.paragraphs.length > 0;
+  const singleText = typeof input === 'string' ? input : (input?.text || '');
+
+  if (isBatch) {
+    const paragraphs = (input as { paragraphs: string[] }).paragraphs.slice(0, 15);
+    if (!client) {
+      return {
+        simplifiedParagraphs: paragraphs.map(p => generateLocalBulletPoints(p)),
+        readingTimeSavedMinutes: Math.max(1, Math.round(paragraphs.length * 0.8)),
+      };
+    }
+
+    try {
+      const prompt = `
+You are an assistive cognitive AI specialized in reducing reading fatigue for neurodivergent readers (ADHD, Dyslexia, Autism, cognitive overload).
+For each of the following paragraphs, write 2 to 3 concise, highly readable, plain-language bullet points capturing the core factual takeaways (6th grade reading level).
+
+Paragraphs to simplify:
+${JSON.stringify(paragraphs.map((p, i) => ({ index: i, text: p.slice(0, 800) })), null, 2)}
+
+Return strictly valid JSON in this schema (no markdown, no extra commentary):
+{
+  "simplified": [
+    { "index": 0, "bullets": ["Bullet point 1", "Bullet point 2"] }
+  ],
+  "estimatedTimeSavedMinutes": 3
+}
+`;
+      const response = await client.models.generateContent({
+        model: 'gemini-1.5-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+        },
+      });
+
+      const parsed = JSON.parse(response.text?.trim() || '{}');
+      const simplifiedMap: Record<number, string[]> = {};
+      if (Array.isArray(parsed.simplified)) {
+        parsed.simplified.forEach((item: any) => {
+          if (typeof item.index === 'number' && Array.isArray(item.bullets)) {
+            simplifiedMap[item.index] = item.bullets;
+          }
+        });
+      }
+
+      const results = paragraphs.map((p, i) => simplifiedMap[i] || generateLocalBulletPoints(p));
+      return {
+        simplifiedParagraphs: results,
+        readingTimeSavedMinutes: parsed.estimatedTimeSavedMinutes || Math.max(1, Math.round(paragraphs.length * 0.8)),
+      };
+    } catch (err) {
+      console.warn('[GeminiService] Batch simplification fallback activated:', err);
+      return {
+        simplifiedParagraphs: paragraphs.map(p => generateLocalBulletPoints(p)),
+        readingTimeSavedMinutes: Math.max(1, Math.round(paragraphs.length * 0.8)),
+      };
+    }
+  }
+
+  // Single text handling
+  if (!client || !singleText.trim()) {
     return {
-      simplifiedText: complexText.slice(0, 200) + '...',
+      simplifiedText: singleText.slice(0, 200) + '...',
       readingTimeSavedMinutes: 1,
     };
   }
@@ -137,7 +218,7 @@ You are an assistive cognitive AI that optimizes reading retention for people wi
 Rewrite the following text into 3-4 clear, bite-sized bullet points using plain, simple language (Flesch-Kincaid Grade Level 6-8). Keep key facts intact.
 
 Original Text:
-${complexText.slice(0, 1500)}
+${singleText.slice(0, 1500)}
 
 Return JSON:
 {
@@ -147,7 +228,7 @@ Return JSON:
 `;
 
     const response = await client.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-1.5-flash',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -155,7 +236,7 @@ Return JSON:
     });
 
     const parsed = JSON.parse(response.text?.trim() || '{}');
-    const bullets = Array.isArray(parsed.bulletPoints) ? parsed.bulletPoints.join('\n• ') : complexText;
+    const bullets = Array.isArray(parsed.bulletPoints) ? parsed.bulletPoints.join('\n• ') : singleText;
 
     return {
       simplifiedText: `• ${bullets}`,
@@ -164,7 +245,7 @@ Return JSON:
   } catch (error) {
     console.error('[GeminiService] Error simplifying text with Gemini:', error);
     return {
-      simplifiedText: complexText.slice(0, 300) + '...',
+      simplifiedText: singleText.slice(0, 300) + '...',
       readingTimeSavedMinutes: 1,
     };
   }

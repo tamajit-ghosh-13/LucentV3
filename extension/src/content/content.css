@@ -589,28 +589,43 @@ html.lucent-bold-text div {
   will-change: transform !important;
 }
 
-/* Hover Magnifier Loupe */
+/* Hover Magnifier Loupe: Ergonomic Floating Rectangular Tooltip */
 .lucent-magnifier-loupe {
   position: fixed !important;
-  width: 170px !important;
-  height: 170px !important;
-  border-radius: 50% !important;
-  border: 3px solid #fbbf24 !important;
-  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.8), 0 15px 35px rgba(0, 0, 0, 0.6) !important;
+  max-width: 440px !important;
+  min-width: 140px !important;
+  width: max-content !important;
+  height: auto !important;
+  border-radius: 10px !important;
+  border: 2px solid #ffd700 !important;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.95), 0 16px 36px rgba(0, 0, 0, 0.75), 0 0 16px rgba(255, 215, 0, 0.25) !important;
   pointer-events: none !important;
   z-index: 2147483645 !important;
   overflow: hidden !important;
   left: 0 !important;
   top: 0 !important;
-  transform: translate(-300px, -300px);
-  background: #000 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  color: #fff !important;
-  font: 700 16px/1.3 system-ui !important;
-  padding: 14px !important;
-  text-align: center !important;
+  transform: translate(-999px, -999px);
+  background: #090d16 !important;
+  display: block !important;
+  color: #fef08a !important;
+  font: 600 16px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  padding: 10px 16px !important;
+  text-align: left !important;
+  word-break: normal !important;
+  word-wrap: break-word !important;
+  letter-spacing: 0.02em !important;
+  transition: opacity 0.12s ease !important;
+  opacity: 0;
+}
+
+.lucent-magnifier-loupe .lucent-loupe-focused-word {
+  color: #ffffff !important;
+  background-color: rgba(234, 179, 8, 0.35) !important;
+  padding: 1px 5px !important;
+  border-radius: 4px !important;
+  font-weight: 800 !important;
+  text-decoration: underline !important;
+  text-decoration-color: #ffd700 !important;
 }
 
 /* Text-to-Speech Active Sentence Highlight */
@@ -658,5 +673,96 @@ html.lucent-bold-text div {
 .lucent-ai-toast-icon {
   font-size: 16px !important;
   color: #4ade80 !important;
+}
+
+/* Cognitive: AI Text Simplification & Summarization Cards */
+.lucent-simplified-card {
+  background: #0d1a13 !important;
+  border: 1.5px solid #2e6040 !important;
+  border-left: 5px solid #4ade80 !important;
+  border-radius: 10px !important;
+  padding: 12px 16px !important;
+  margin: 16px 0 !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  font-family: system-ui, -apple-system, sans-serif !important;
+  text-align: left !important;
+  box-sizing: border-box !important;
+}
+
+.lucent-simplified-card:hover {
+  background: #11241a !important;
+  border-color: #4ade80 !important;
+  box-shadow: 0 6px 24px rgba(74, 222, 128, 0.15) !important;
+}
+
+.lucent-simplified-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-bottom: 8px !important;
+  padding-bottom: 6px !important;
+  border-bottom: 1px solid rgba(74, 222, 128, 0.2) !important;
+}
+
+.lucent-simplified-tag {
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  color: #4ade80 !important;
+  background: rgba(74, 222, 128, 0.15) !important;
+  padding: 2px 8px !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  letter-spacing: 0.03em !important;
+}
+
+.lucent-simplified-action {
+  font-size: 11px !important;
+  color: #8bb799 !important;
+  font-weight: 600 !important;
+}
+
+.lucent-simplified-bullets {
+  margin: 0 !important;
+  padding-left: 20px !important;
+  list-style-type: disc !important;
+  color: #eafbf0 !important;
+  font-size: 15px !important;
+  line-height: 1.6 !important;
+  letter-spacing: 0.015em !important;
+}
+
+.lucent-simplified-bullets li {
+  margin-bottom: 6px !important;
+  color: #eafbf0 !important;
+}
+
+.lucent-simplified-bullets li:last-child {
+  margin-bottom: 0 !important;
+}
+
+.lucent-original-drawer {
+  padding-top: 8px !important;
+  border-top: 1px dashed rgba(255, 255, 255, 0.15) !important;
+  margin-top: 8px !important;
+}
+
+.lucent-original-label {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  color: #8bb799 !important;
+  text-transform: uppercase !important;
+  margin-bottom: 4px !important;
+  letter-spacing: 0.05em !important;
+}
+
+.lucent-original-body {
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+  color: #cfe5d6 !important;
+  opacity: 0.9 !important;
 }
 

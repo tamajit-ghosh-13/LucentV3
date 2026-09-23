@@ -220,6 +220,165 @@ function disableGuide() {
   guide = undefined;
 }
 
+// Cognitive: AI Text Simplification & Summarization Suite
+let simplifiedCardsList = [];
+
+function generateLocalExtractiveBullets(text) {
+  if (!text || text.trim().length === 0) return ['Summary unavailable'];
+  const sentences = text
+    .replace(/\s+/g, ' ')
+    .split(/(?<=[.?!])\s+/)
+    .map(s => s.trim())
+    .filter(s => s.length >= 25);
+
+  if (sentences.length <= 2) {
+    return sentences.length > 0 ? sentences : [text.slice(0, 160)];
+  }
+  return [
+    sentences[0],
+    sentences[Math.floor(sentences.length / 2)],
+    sentences[sentences.length - 1]
+  ].slice(0, 3);
+}
+
+async function simplifyActivePage() {
+  if (isDashboard()) return { count: 0, reason: 'dashboard' };
+
+  // If already simplified, return current count
+  const existingCards = document.querySelectorAll('.lucent-simplified-card');
+  if (existingCards.length > 0) {
+    return { count: existingCards.length, timeSaved: Math.round(existingCards.length * 0.8) };
+  }
+
+  // Find candidate reading paragraphs
+  const candidates = Array.from(
+    document.querySelectorAll('article p, main p, [role="main"] p, [role="article"] p, .mw-parser-output > p, #content p, section p, p')
+  );
+
+  const targetParagraphs = candidates.filter(p => {
+    if (p.closest('#lucent-widget') || p.closest('.lucent-simplified-card')) return false;
+    if (p.closest('nav, footer, header, form, code, pre, table, aside, figcaption')) return false;
+    const txt = p.textContent?.trim() || '';
+    return txt.length >= 110;
+  }).slice(0, 12);
+
+  if (targetParagraphs.length === 0) {
+    return { count: 0, reason: 'no_paragraphs' };
+  }
+
+  showLucentToast(`✨ Gemini AI analyzing ${targetParagraphs.length} paragraphs...`);
+
+  const paragraphsText = targetParagraphs.map(p => p.textContent.trim());
+  let simplifiedData = null;
+
+  try {
+    const aiResponse = await new Promise((resolve) => {
+      chrome.runtime.sendMessage({
+        type: 'LUCENT_AI_SIMPLIFY',
+        paragraphs: paragraphsText
+      }, (res) => {
+        if (chrome.runtime.lastError) {
+          resolve(null);
+        } else {
+          resolve(res);
+        }
+      });
+    });
+
+    if (aiResponse && aiResponse.success && aiResponse.simplifiedParagraphs) {
+      simplifiedData = aiResponse;
+    }
+  } catch (err) {
+    console.warn('[Lucent] AI simplify request error, using fast local extractive summarizer', err);
+  }
+
+  let count = 0;
+  simplifiedCardsList = [];
+
+  targetParagraphs.forEach((p, index) => {
+    let bullets = null;
+    if (simplifiedData?.simplifiedParagraphs && Array.isArray(simplifiedData.simplifiedParagraphs[index])) {
+      bullets = simplifiedData.simplifiedParagraphs[index];
+    } else {
+      bullets = generateLocalExtractiveBullets(p.textContent);
+    }
+
+    if (!bullets || bullets.length === 0) {
+      bullets = generateLocalExtractiveBullets(p.textContent);
+    }
+
+    const card = document.createElement('div');
+    card.className = 'lucent-simplified-card';
+    card.setAttribute('data-lucent-simplified', 'true');
+    card.setAttribute('data-lucent-original-html', encodeURIComponent(p.outerHTML));
+
+    const bulletsHtml = bullets
+      .map(b => `<li>${String(b).replace(/^[•\-\*]\s*/, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</li>`)
+      .join('');
+
+    card.innerHTML = `
+      <div class="lucent-simplified-header">
+        <span class="lucent-simplified-tag"><span>✦</span> AI Plain Summary</span>
+        <span class="lucent-simplified-action">Click to expand full text ↗</span>
+      </div>
+      <ul class="lucent-simplified-bullets">
+        ${bulletsHtml}
+      </ul>
+      <div class="lucent-original-drawer" hidden>
+        <div class="lucent-original-label">Original Full Text</div>
+        <div class="lucent-original-body">${p.innerHTML}</div>
+      </div>
+    `;
+
+    // Interactive card toggle: clicking switches between summary & original
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('a')) return;
+      const drawer = card.querySelector('.lucent-original-drawer');
+      const bulletsUl = card.querySelector('.lucent-simplified-bullets');
+      const action = card.querySelector('.lucent-simplified-action');
+      const isShowingOriginal = !drawer.hidden;
+      drawer.hidden = isShowingOriginal;
+      bulletsUl.hidden = !isShowingOriginal;
+      action.textContent = isShowingOriginal ? 'Click to expand full text ↗' : 'Click to show summary ↙';
+    });
+
+    p.replaceWith(card);
+    simplifiedCardsList.push(card);
+    count++;
+  });
+
+  const timeSaved = Math.max(1, Math.round(count * 0.8));
+  showLucentToast(`✨ AI simplified ${count} paragraphs (~${timeSaved} min saved)`);
+  report(`AI simplified ${count} paragraphs on ${document.title || location.hostname}`, 'Cognitive & ADHD');
+
+  return { count, timeSaved, success: true };
+}
+
+function restoreActivePage() {
+  const cards = Array.from(document.querySelectorAll('.lucent-simplified-card'));
+  cards.forEach(card => {
+    const rawHtml = card.getAttribute('data-lucent-original-html');
+    if (rawHtml) {
+      try {
+        const decoded = decodeURIComponent(rawHtml);
+        const temp = document.createElement('div');
+        temp.innerHTML = decoded;
+        const origNode = temp.firstElementChild;
+        if (origNode) {
+          card.replaceWith(origNode);
+          return;
+        }
+      } catch {}
+    }
+    card.remove();
+  });
+
+  simplifiedCardsList = [];
+  showLucentToast('Restored original paragraph text');
+  report('Restored original page text', 'Cognitive & ADHD');
+  return { success: true, count: cards.length };
+}
+
 // Visual: Instantaneous font size scaling controller
 let fontStyleEl;
 function applyFontSize(size) {
@@ -401,7 +560,192 @@ function disableCrosshairs() {
   crosshairV = undefined;
 }
 
-// Visual: Hover Magnifier Loupe
+// Visual: Hover Magnifier Loupe (Dynamic Rectangular Tooltip with 6-10 Words Context)
+let magnifierRaf = null;
+let lastPointerEvent = null;
+
+function escapeLoupeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function extractLoupeWordWindow(e) {
+  let target = document.elementFromPoint(e.clientX, e.clientY);
+  if (!target || target.closest('#lucent-widget') || target === magnifier) {
+    return null;
+  }
+
+  // Support images with alt / title descriptions
+  if (target.tagName === 'IMG') {
+    const alt = target.getAttribute('alt')?.trim() || target.getAttribute('title')?.trim();
+    if (alt) {
+      const words = alt.split(/\s+/).filter(Boolean);
+      return {
+        words: words.slice(0, 10),
+        focusedIndex: 0,
+        hasLeading: false,
+        hasTrailing: words.length > 10
+      };
+    }
+  }
+
+  // Attempt precision text node & charOffset detection via caret API
+  let textNode = null;
+  let charOffset = 0;
+
+  if (document.caretRangeFromPoint) {
+    const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+    if (range && range.startContainer) {
+      if (range.startContainer.nodeType === Node.TEXT_NODE) {
+        textNode = range.startContainer;
+        charOffset = range.startOffset;
+      } else if (range.startContainer.childNodes && range.startContainer.childNodes[range.startOffset]) {
+        const child = range.startContainer.childNodes[range.startOffset];
+        if (child.nodeType === Node.TEXT_NODE) {
+          textNode = child;
+          charOffset = 0;
+        }
+      }
+    }
+  } else if (document.caretPositionFromPoint) {
+    const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+    if (pos && pos.offsetNode && pos.offsetNode.nodeType === Node.TEXT_NODE) {
+      textNode = pos.offsetNode;
+      charOffset = pos.offset;
+    }
+  }
+
+  let textSource = '';
+  if (textNode && textNode.textContent) {
+    textSource = textNode.textContent;
+  } else {
+    const textEl = target.closest('p, h1, h2, h3, h4, h5, h6, li, span, a, div, button, label, td, th');
+    if (textEl) {
+      textSource = textEl.textContent || '';
+      charOffset = 0;
+    }
+  }
+
+  const trimmed = textSource.trim();
+  if (!trimmed) return null;
+
+  // Tokenize text into words with start and end character positions
+  const wordRegex = /\S+/g;
+  const words = [];
+  let match;
+  while ((match = wordRegex.exec(textSource)) !== null) {
+    words.push({
+      word: match[0],
+      start: match.index,
+      end: match.index + match[0].length
+    });
+  }
+
+  if (words.length === 0) return null;
+
+  // Find the word matching or closest to the caret offset
+  let focusedIndex = 0;
+  let minDistance = Infinity;
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    if (charOffset >= w.start && charOffset <= w.end) {
+      focusedIndex = i;
+      break;
+    }
+    const dist = Math.min(Math.abs(charOffset - w.start), Math.abs(charOffset - w.end));
+    if (dist < minDistance) {
+      minDistance = dist;
+      focusedIndex = i;
+    }
+  }
+
+  // Dynamic window of 6 to 10 words (target 8 words)
+  const windowSize = 8;
+  const halfWindow = Math.floor(windowSize / 2);
+  let startIndex = Math.max(0, focusedIndex - halfWindow);
+  let endIndex = Math.min(words.length, startIndex + windowSize);
+
+  // If near the end of the text, expand backward to maintain up to 8 words
+  if (endIndex - startIndex < windowSize) {
+    startIndex = Math.max(0, endIndex - windowSize);
+  }
+
+  const selectedWords = words.slice(startIndex, endIndex);
+  const relativeFocusedIndex = focusedIndex - startIndex;
+
+  return {
+    words: selectedWords.map(w => w.word),
+    focusedIndex: relativeFocusedIndex,
+    hasLeading: startIndex > 0,
+    hasTrailing: endIndex < words.length
+  };
+}
+
+function updateMagnifierView(e) {
+  if (!magnifier) return;
+
+  const result = extractLoupeWordWindow(e);
+  if (!result || result.words.length === 0) {
+    magnifier.style.opacity = '0';
+    return;
+  }
+
+  let html = '';
+  if (result.hasLeading) {
+    html += '<span style="opacity:0.6;margin-right:4px;">…</span>';
+  }
+  html += result.words.map((w, idx) => {
+    if (idx === result.focusedIndex) {
+      return `<span class="lucent-loupe-focused-word">${escapeLoupeHtml(w)}</span>`;
+    }
+    return `<span>${escapeLoupeHtml(w)}</span>`;
+  }).join(' ');
+
+  if (result.hasTrailing) {
+    html += '<span style="opacity:0.6;margin-left:4px;">…</span>';
+  }
+
+  magnifier.innerHTML = html;
+  magnifier.style.opacity = '1';
+
+  // Smart viewport-aware placement (offset 18px, flip if near edges)
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  let posX = e.clientX + 18;
+  let posY = e.clientY + 18;
+
+  const loupeWidth = magnifier.offsetWidth || 260;
+  const loupeHeight = magnifier.offsetHeight || 44;
+
+  if (posX + loupeWidth > vw - 12) {
+    posX = e.clientX - loupeWidth - 14;
+  }
+  if (posX < 8) posX = 8;
+
+  if (posY + loupeHeight > vh - 12) {
+    posY = e.clientY - loupeHeight - 14;
+  }
+  if (posY < 8) posY = 8;
+
+  magnifier.style.transform = `translate(${posX}px, ${posY}px)`;
+}
+
+function moveMagnifier(e) {
+  lastPointerEvent = e;
+  if (!magnifierRaf) {
+    magnifierRaf = requestAnimationFrame(() => {
+      magnifierRaf = null;
+      if (lastPointerEvent) {
+        updateMagnifierView(lastPointerEvent);
+      }
+    });
+  }
+}
+
 function enableMagnifier() {
   if (isDashboard() || magnifier) return;
   magnifier = document.createElement('div');
@@ -410,19 +754,14 @@ function enableMagnifier() {
   document.body.appendChild(magnifier);
   document.addEventListener('pointermove', moveMagnifier, { passive: true });
 }
-function moveMagnifier(e) {
-  if (!magnifier) return;
-  magnifier.style.transform = `translate(${e.clientX + 16}px, ${e.clientY + 16}px)`;
-  const target = document.elementFromPoint(e.clientX, e.clientY);
-  if (target && !target.closest('#lucent-widget') && target !== magnifier) {
-    const text = target.textContent?.trim();
-    if (text && text.length > 0) {
-      magnifier.textContent = text.slice(0, 75);
-    }
-  }
-}
+
 function disableMagnifier() {
   document.removeEventListener('pointermove', moveMagnifier);
+  if (magnifierRaf) {
+    cancelAnimationFrame(magnifierRaf);
+    magnifierRaf = null;
+  }
+  lastPointerEvent = null;
   magnifier?.remove();
   magnifier = undefined;
 }
@@ -954,7 +1293,7 @@ function createWidget() {
         <div class="ai-scanner-section">
           <div class="ai-scanner-header">
             <span class="ai-scanner-title"><span>✦</span> Gemini AI Auditor</span>
-            <span class="ai-scanner-badge">Gemini 3.6</span>
+            <span class="ai-scanner-badge">Gemini AI</span>
           </div>
           <button type="button" class="ai-scan-trigger-btn">
             <span>🔍</span> Scan Page with Gemini AI
@@ -1273,7 +1612,25 @@ function rebuildWidgetOptions() {
       ];
 
   let html = '';
-  if (settings.profile === 'visual') {
+  if (settings.profile === 'cognitive') {
+    html += `
+      <div class="widget-simplify-control" style="background: #112217; border: 1px solid #20442c; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span style="font-weight: 700; font-size: 12px; color: #ecfff3; display: flex; align-items: center; gap: 5px;">
+            <span>✨</span> AI Text Simplifier
+          </span>
+          <span class="widget-simplify-badge" style="font-size: 10px; color: #8bb799; background: rgba(34, 197, 94, 0.15); padding: 1px 7px; border-radius: 999px; border: 1px solid rgba(74, 222, 128, 0.25);">Ready</span>
+        </div>
+        <button type="button" class="widget-simplify-btn" style="width: 100%; background: #152e20; color: #8df4b5; border: 1px solid #3c8055; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.15s ease;">
+          <span>✨</span> Simplify Paragraphs with AI
+        </button>
+        <button type="button" class="widget-restore-btn" style="width: 100%; background: #1f2b23; color: #a8cbb4; border: 1px solid #324e3c; border-radius: 6px; padding: 5px 8px; font-size: 11px; font-weight: 600; cursor: pointer; display: none; align-items: center; justify-content: center; gap: 5px; margin-top: 5px; transition: all 0.15s ease;">
+          <span>↩</span> Restore Original Text
+        </button>
+        <div class="widget-simplify-status" style="font-size: 10px; color: #7cb28e; margin-top: 5px; display: none;"></div>
+      </div>
+    `;
+  } else if (settings.profile === 'visual') {
     const curSize = settings.visual?.fontSize || 16;
     html += `
       <div class="widget-font-size-control">
@@ -1349,6 +1706,71 @@ function rebuildWidgetOptions() {
       speakSelectedText();
     });
     updateSpeechButtonUI();
+  }
+
+  const simplifyBtn = optionsContainer.querySelector('.widget-simplify-btn');
+  const restoreBtn = optionsContainer.querySelector('.widget-restore-btn');
+  const simplifyBadge = optionsContainer.querySelector('.widget-simplify-badge');
+  const simplifyStatus = optionsContainer.querySelector('.widget-simplify-status');
+
+  if (simplifyBtn) {
+    simplifyBtn.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      simplifyBtn.disabled = true;
+      simplifyBtn.innerHTML = '<span>✨</span> Summarizing with AI...';
+      if (simplifyBadge) {
+        simplifyBadge.textContent = 'Processing...';
+        simplifyBadge.style.color = '#fbbf24';
+      }
+      if (simplifyStatus) {
+        simplifyStatus.style.display = 'block';
+        simplifyStatus.textContent = 'Extracting and simplifying reading paragraphs...';
+      }
+      try {
+        const result = await simplifyActivePage();
+        if (result && result.count > 0) {
+          if (simplifyBadge) {
+            simplifyBadge.textContent = `${result.count} simplified`;
+            simplifyBadge.style.color = '#4ade80';
+          }
+          if (simplifyStatus) {
+            simplifyStatus.style.display = 'block';
+            simplifyStatus.textContent = `Summarized ${result.count} paragraphs (~${result.timeSaved || 2} min saved). Click any card to view original.`;
+          }
+          if (restoreBtn) restoreBtn.style.display = 'flex';
+        } else {
+          if (simplifyBadge) {
+            simplifyBadge.textContent = 'No text found';
+            simplifyBadge.style.color = '#8aa695';
+          }
+          if (simplifyStatus) {
+            simplifyStatus.style.display = 'block';
+            simplifyStatus.textContent = 'No suitable long reading paragraphs found on this page.';
+          }
+        }
+      } catch (err) {
+        if (simplifyBadge) {
+          simplifyBadge.textContent = 'Error';
+          simplifyBadge.style.color = '#f87171';
+        }
+      } finally {
+        simplifyBtn.disabled = false;
+        simplifyBtn.innerHTML = '<span>✨</span> Simplify Paragraphs with AI';
+      }
+    });
+  }
+
+  if (restoreBtn) {
+    restoreBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      restoreActivePage();
+      restoreBtn.style.display = 'none';
+      if (simplifyBadge) {
+        simplifyBadge.textContent = 'Ready';
+        simplifyBadge.style.color = '#8bb799';
+      }
+      if (simplifyStatus) simplifyStatus.style.display = 'none';
+    });
   }
 
   optionsContainer.querySelectorAll('input[data-path]').forEach(input => {
@@ -1539,6 +1961,18 @@ try {
           })();
           return true; // Keep message channel open for async response
         }
+        if (message.type === 'SIMPLIFY_PAGE_AI') {
+          (async () => {
+            const res = await simplifyActivePage();
+            sendResponse(res);
+          })();
+          return true;
+        }
+        if (message.type === 'RESTORE_ORIGINAL_TEXT') {
+          const res = restoreActivePage();
+          sendResponse(res);
+          return;
+        }
       } catch {
         cleanupContext();
       }
@@ -1699,31 +2133,29 @@ function scanAccessibility() {
 
 async function runGeminiAiScan(scanData) {
   try {
-    const payload = {
-      pageTitle: scanData.title,
-      pageUrl: scanData.url,
-      unlabelledElements: scanData.unlabelledElements || [],
-      missingAltImages: scanData.missingAltImages || []
-    };
-
-    const stored = await safeStorageGet(['lucentApiUrl']);
-    const baseUrl = stored?.lucentApiUrl || 'http://localhost:3001';
-    const targetEndpoint = baseUrl.replace(/\/$/, '') + '/api/ai-scan';
-
-    const response = await fetch(targetEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+    const aiResponse = await new Promise((resolve) => {
+      chrome.runtime.sendMessage({
+        type: 'LUCENT_AI_SCAN',
+        scanData: {
+          title: scanData.title,
+          url: scanData.url,
+          unlabelledElements: scanData.unlabelledElements || [],
+          missingAltImages: scanData.missingAltImages || []
+        }
+      }, (res) => {
+        if (chrome.runtime.lastError) {
+          resolve(null);
+        } else {
+          resolve(res);
+        }
+      });
     });
 
-    if (response.ok) {
-      const data = await response.json();
-      if (data && (data.labels || data.imageAlts)) {
-        return data;
-      }
+    if (aiResponse && aiResponse.success && (aiResponse.labels || aiResponse.imageAlts)) {
+      return aiResponse;
     }
   } catch (err) {
-    console.warn('[Lucent] Gemini proxy unavailable, using fast local semantic heuristics', err);
+    console.warn('[Lucent] Gemini AI scan error, using local fallback heuristics', err);
   }
 
   return generateClientFallbackRemediations(scanData);

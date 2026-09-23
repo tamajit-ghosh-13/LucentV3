@@ -334,3 +334,112 @@ if (popupSpeakBtn) {
   });
 }
 
+// Cognitive: AI Text Simplification Controller
+const popupSimplifyBtn = document.getElementById('popup-simplify-btn');
+const popupRestoreBtn = document.getElementById('popup-restore-btn');
+const popupSimplifyBadge = document.getElementById('popup-simplify-badge');
+const popupSimplifyStatus = document.getElementById('popup-simplify-status');
+
+if (popupSimplifyBtn) {
+  popupSimplifyBtn.addEventListener('click', async () => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+
+    popupSimplifyBtn.disabled = true;
+    popupSimplifyBtn.innerHTML = '<span>✨</span> Summarizing with AI...';
+    if (popupSimplifyBadge) {
+      popupSimplifyBadge.textContent = 'Processing...';
+      popupSimplifyBadge.style.color = '#fbbf24';
+    }
+    if (popupSimplifyStatus) {
+      popupSimplifyStatus.style.display = 'block';
+      popupSimplifyStatus.textContent = 'Extracting and simplifying reading paragraphs...';
+    }
+
+    chrome.tabs.sendMessage(tab.id, { type: 'SIMPLIFY_PAGE_AI' }, response => {
+      popupSimplifyBtn.disabled = false;
+      popupSimplifyBtn.innerHTML = '<span>✨</span> Simplify Paragraphs with AI';
+
+      if (response && response.count > 0) {
+        if (popupSimplifyBadge) {
+          popupSimplifyBadge.textContent = `${response.count} simplified`;
+          popupSimplifyBadge.style.color = '#4ade80';
+        }
+        if (popupSimplifyStatus) {
+          popupSimplifyStatus.style.display = 'block';
+          popupSimplifyStatus.textContent = `Summarized ${response.count} paragraphs (~${response.timeSaved || 2} min saved). Click any card on page to view original.`;
+        }
+        if (popupRestoreBtn) popupRestoreBtn.style.display = 'flex';
+        recordEvent(`AI simplified ${response.count} paragraphs on active tab`, 'Cognitive & ADHD');
+      } else {
+        if (popupSimplifyBadge) {
+          popupSimplifyBadge.textContent = 'No text found';
+          popupSimplifyBadge.style.color = '#8aa695';
+        }
+        if (popupSimplifyStatus) {
+          popupSimplifyStatus.style.display = 'block';
+          popupSimplifyStatus.textContent = 'No suitable long reading paragraphs found on this page.';
+        }
+      }
+    });
+  });
+}
+
+if (popupRestoreBtn) {
+  popupRestoreBtn.addEventListener('click', async () => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+
+    chrome.tabs.sendMessage(tab.id, { type: 'RESTORE_ORIGINAL_TEXT' }, () => {
+      if (popupRestoreBtn) popupRestoreBtn.style.display = 'none';
+      if (popupSimplifyBadge) {
+        popupSimplifyBadge.textContent = 'Ready';
+        popupSimplifyBadge.style.color = '#8bb799';
+      }
+      if (popupSimplifyStatus) popupSimplifyStatus.style.display = 'none';
+      recordEvent('Restored original paragraph text', 'Cognitive & ADHD');
+    });
+  });
+}
+
+// Gemini API Key Management
+const apiKeyInput = document.getElementById('custom-api-key-input');
+const apiKeySaveBtn = document.getElementById('save-api-key-btn');
+const apiKeyStatus = document.getElementById('api-key-status');
+const apiKeyIndicator = document.getElementById('api-key-indicator');
+
+chrome.runtime.sendMessage({ type: 'GET_GEMINI_KEY' }, (res) => {
+  if (chrome.runtime.lastError || !res) return;
+  if (apiKeyInput && res.isCustom) {
+    apiKeyInput.value = res.apiKey;
+  }
+  if (apiKeyIndicator) {
+    apiKeyIndicator.textContent = res.isCustom ? 'Custom Key' : 'Default Key';
+    apiKeyIndicator.style.color = res.isCustom ? '#60a5fa' : '#4ade80';
+  }
+});
+
+apiKeySaveBtn?.addEventListener('click', () => {
+  const keyVal = apiKeyInput?.value?.trim() || '';
+  apiKeySaveBtn.disabled = true;
+  apiKeySaveBtn.textContent = '...';
+
+  chrome.runtime.sendMessage({ type: 'SET_GEMINI_KEY', apiKey: keyVal }, () => {
+    apiKeySaveBtn.disabled = false;
+    apiKeySaveBtn.textContent = 'Save';
+
+    if (apiKeyStatus) {
+      apiKeyStatus.style.display = 'block';
+      apiKeyStatus.textContent = keyVal ? 'Custom Gemini API key saved!' : 'Reset to default Gemini free-tier key.';
+      setTimeout(() => {
+        apiKeyStatus.style.display = 'none';
+      }, 3000);
+    }
+    if (apiKeyIndicator) {
+      apiKeyIndicator.textContent = keyVal ? 'Custom Key' : 'Default Key';
+      apiKeyIndicator.style.color = keyVal ? '#60a5fa' : '#4ade80';
+    }
+  });
+});
+
+

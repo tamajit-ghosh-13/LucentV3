@@ -14,20 +14,60 @@ export default async function handler(req, res) {
   }
 
   const apiKey = process.env.GEMINI_API_KEY || '';
-  const text = (req.body && req.body.text) || '';
+  const paragraphs = req.body?.paragraphs;
+  const singleText = req.body?.text || '';
 
-  if (!apiKey || !text.trim()) {
+  if (!apiKey || (!paragraphs && !singleText.trim())) {
     return res.status(200).json({
-      simplifiedText: text ? `• ${text.slice(0, 200)}...` : '',
+      simplifiedParagraphs: Array.isArray(paragraphs) ? paragraphs.map(p => [p.slice(0, 160)]) : undefined,
+      simplifiedText: singleText ? `• ${singleText.slice(0, 200)}...` : '',
       readingTimeSavedMinutes: 1
     });
   }
 
   try {
     const ai = new GoogleGenAI({ apiKey });
+
+    if (Array.isArray(paragraphs) && paragraphs.length > 0) {
+      const prompt = `
+You are an assistive cognitive AI specialized in reducing reading fatigue for neurodivergent readers (ADHD, Dyslexia, Autism, cognitive overload).
+For each of the following paragraphs, write 2 to 3 concise, highly readable, plain-language bullet points capturing the core factual takeaways (6th grade reading level).
+
+Paragraphs to simplify:
+${JSON.stringify(paragraphs.slice(0, 15).map((p, i) => ({ index: i, text: p.slice(0, 800) })), null, 2)}
+
+Return strictly valid JSON:
+{
+  "simplified": [
+    { "index": 0, "bullets": ["Bullet 1", "Bullet 2"] }
+  ],
+  "estimatedTimeSavedMinutes": 3
+}
+`;
+      const response = await ai.models.generateContent({
+        model: 'gemini-1.5-flash',
+        contents: prompt,
+        config: { responseMimeType: 'application/json' }
+      });
+      const parsed = JSON.parse(response.text?.trim() || '{}');
+      const simplifiedMap = {};
+      if (Array.isArray(parsed.simplified)) {
+        parsed.simplified.forEach(item => {
+          if (typeof item.index === 'number' && Array.isArray(item.bullets)) {
+            simplifiedMap[item.index] = item.bullets;
+          }
+        });
+      }
+      const results = paragraphs.map((p, i) => simplifiedMap[i] || [p.slice(0, 160)]);
+      return res.status(200).json({
+        simplifiedParagraphs: results,
+        readingTimeSavedMinutes: parsed.estimatedTimeSavedMinutes || Math.max(1, Math.round(paragraphs.length * 0.8))
+      });
+    }
+
     const prompt = `
 Rewrite the following text into 3-4 clear, bite-sized bullet points using plain, simple language for readers with ADHD/cognitive overload:
-${text.slice(0, 1500)}
+${singleText.slice(0, 1500)}
 
 Return JSON:
 {
@@ -36,12 +76,12 @@ Return JSON:
 }
 `;
     const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-1.5-flash',
       contents: prompt,
       config: { responseMimeType: 'application/json' }
     });
     const parsed = JSON.parse(response.text?.trim() || '{}');
-    const bullets = Array.isArray(parsed.bulletPoints) ? parsed.bulletPoints.join('\n• ') : text;
+    const bullets = Array.isArray(parsed.bulletPoints) ? parsed.bulletPoints.join('\n• ') : singleText;
     return res.status(200).json({
       simplifiedText: `• ${bullets}`,
       readingTimeSavedMinutes: parsed.estimatedTimeSavedMinutes || 1
@@ -49,7 +89,8 @@ Return JSON:
   } catch (err) {
     console.error('Gemini simplify error:', err);
     return res.status(200).json({
-      simplifiedText: `• ${text.slice(0, 250)}...`,
+      simplifiedText: singleText ? `• ${singleText.slice(0, 250)}...` : '',
+      simplifiedParagraphs: Array.isArray(paragraphs) ? paragraphs.map(p => [p.slice(0, 160)]) : undefined,
       readingTimeSavedMinutes: 1
     });
   }

@@ -50,7 +50,7 @@ function geminiApiPlugin(apiKey: string): Plugin {
             try {
               const data = JSON.parse(body || '{}');
               const { simplifyTextWithGemini } = await import('./src/lib/gemini-service.ts');
-              const result = await simplifyTextWithGemini(data.text || '');
+              const result = await simplifyTextWithGemini(data);
               res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify(result));
             } catch (err: any) {

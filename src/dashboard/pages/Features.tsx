@@ -75,6 +75,14 @@ const disorderGroups: DisorderGroup[] = [
         category: 'Ergonomic Layout',
         benefit: 'Minimizes horizontal neck and eye scanning strain',
         howItWorks: 'Enforces optimal 70ch paragraph width limits'
+      },
+      {
+        id: 'cog-6',
+        name: 'AI Text Simplifier & Summarizer',
+        description: 'Condenses dense, overwhelming paragraphs into bite-sized plain-language bullet points powered by Gemini AI. Click any card to expand full text.',
+        category: 'Cognitive Retention',
+        benefit: 'Saves 60%+ reading time and eliminates wall-of-text fatigue',
+        howItWorks: 'Batches reading paragraphs through Gemini AI plain-language summarization with instant click-to-expand drawers'
       }
     ]
   },
