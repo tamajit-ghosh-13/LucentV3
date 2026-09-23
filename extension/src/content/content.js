@@ -325,13 +325,7 @@ async function simplifySelectedText(customText) {
 
   card.innerHTML = `
     <div class="lucent-simplified-header">
-      <span class="lucent-simplified-tag">
-        <span>✦</span> AI Plain Summary
-        ${isCached
-          ? '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(34,197,94,0.18);color:#10b981;font-weight:700;margin-left:6px;letter-spacing:0.3px;">⚡ CACHED</span>'
-          : '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(99,102,241,0.18);color:#818cf8;font-weight:700;margin-left:6px;letter-spacing:0.3px;">1/3 LENGTH</span>'
-        }
-      </span>
+      <span class="lucent-simplified-tag"><span>✦</span> AI Plain Summary</span>
       <span class="lucent-simplified-action">Click to expand full text ↗</span>
     </div>
     <ul class="lucent-simplified-bullets">
@@ -371,13 +365,8 @@ async function simplifySelectedText(customText) {
   simplifiedCardsList.push(card);
   setSimplifyButtonState(false, true);
 
-  if (isCached) {
-    showLucentToast('⚡ Instant AI summary loaded from cache (1/3 length)!');
-    flashSimplifyStatus('Cached ⚡');
-  } else {
-    showLucentToast('✨ Simplified into 1/3 length plain summary! Click card to toggle original.');
-    flashSimplifyStatus('Simplified! ✨');
-  }
+  showLucentToast('✨ Simplified selected text! Click card to toggle original.');
+  flashSimplifyStatus('Simplified! ✨');
   report(`AI simplified selected paragraph on ${document.title || location.hostname}`, 'Cognitive & ADHD');
 
   return { count: 1, timeSaved: 1, success: true, text, cached: isCached };
