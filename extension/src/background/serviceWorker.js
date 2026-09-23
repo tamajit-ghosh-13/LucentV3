@@ -97,16 +97,189 @@ async function callGeminiApi(prompt) {
     throw lastError || new Error('All Gemini models failed');
 }
 
+// Simplification Cache System (LRU, Chrome Storage backed)
+const SIMPLIFY_CACHE_KEY = 'lucent_simplify_cache';
+const MAX_CACHE_ENTRIES = 120;
+let memSimplifyCache = null;
+
+function normalizeTextForCache(text) {
+    return (text || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function computeCacheKey(text) {
+    const normalized = normalizeTextForCache(text);
+    let hash = 5381;
+    for (let i = 0; i < normalized.length; i++) {
+        hash = ((hash << 5) + hash) + normalized.charCodeAt(i);
+        hash = hash & hash;
+    }
+    return `c_${Math.abs(hash)}_${normalized.length}`;
+}
+
+async function loadSimplifyCache() {
+    if (memSimplifyCache !== null) return memSimplifyCache;
+    try {
+        const data = await chrome.storage.local.get(SIMPLIFY_CACHE_KEY);
+        memSimplifyCache = data[SIMPLIFY_CACHE_KEY] || {};
+    } catch (err) {
+        console.warn('[Lucent ServiceWorker] Failed to load simplify cache:', err);
+        memSimplifyCache = {};
+    }
+    return memSimplifyCache;
+}
+
+async function getCachedSimplification(text) {
+    if (!text || typeof text !== 'string') return null;
+    const key = computeCacheKey(text);
+    const cache = await loadSimplifyCache();
+    const entry = cache[key];
+    if (entry && entry.result) {
+        entry.ts = Date.now();
+        return entry.result;
+    }
+    return null;
+}
+
+async function setCachedSimplification(text, result) {
+    if (!text || !result) return;
+    const key = computeCacheKey(text);
+    const cache = await loadSimplifyCache();
+
+    const keys = Object.keys(cache);
+    if (keys.length >= MAX_CACHE_ENTRIES) {
+        keys.sort((a, b) => (cache[a]?.ts || 0) - (cache[b]?.ts || 0));
+        const toRemove = keys.slice(0, Math.floor(MAX_CACHE_ENTRIES * 0.25));
+        for (const k of toRemove) {
+            delete cache[k];
+        }
+    }
+
+    cache[key] = {
+        ts: Date.now(),
+        result: result
+    };
+
+    try {
+        await chrome.storage.local.set({ [SIMPLIFY_CACHE_KEY]: cache });
+    } catch (err) {
+        console.warn('[Lucent ServiceWorker] Failed to persist simplify cache:', err);
+    }
+}
+
 async function handleAiSimplify(message) {
     const paragraphs = message.paragraphs;
     const singleText = message.text;
 
-    if (Array.isArray(paragraphs) && paragraphs.length > 0) {
-        const prompt = `You are an assistive cognitive AI specialized in reducing reading fatigue for neurodivergent readers (ADHD, Dyslexia, Autism, cognitive overload).
-For each of the following numbered paragraphs, write 2 to 3 concise, highly readable, plain-language bullet points capturing the core factual takeaways (6th grade reading level).
+    // Target single paragraph / selection
+    const targetSingleText = singleText || (Array.isArray(paragraphs) && paragraphs.length === 1 ? paragraphs[0] : null);
+
+    if (targetSingleText) {
+        // 1. Check cache first for exact/normalized text hit
+        const cached = await getCachedSimplification(targetSingleText);
+        if (cached) {
+            console.log('[Lucent ServiceWorker] Cache HIT for text simplification');
+            return {
+                ...cached,
+                cached: true
+            };
+        }
+
+        const words = targetSingleText.trim().split(/\s+/).filter(Boolean);
+        const originalWordCount = words.length;
+        // Strictly target approximately 1/3 of the input word count
+        const targetWordCount = Math.max(8, Math.round(originalWordCount / 3));
+
+        const prompt = `You are an assistive cognitive accessibility AI specialized in reducing cognitive load and reading fatigue for neurodivergent users (ADHD, Dyslexia, Autism, cognitive overload).
+
+ORIGINAL PASSAGE (${originalWordCount} words):
+"""
+${targetSingleText.slice(0, 3000)}
+"""
+
+CRITICAL LENGTH & FORMAT REQUIREMENT:
+1. TARGET LENGTH: STRICTLY approximately ONE-THIRD (1/3) the word count of the original passage.
+   - Original word count: ~${originalWordCount} words.
+   - Target total summary length: around ~${targetWordCount} words combined across all bullet points.
+   - Do NOT produce a lengthy rephrasing. Summarize concisely, cutting out 2/3 of the volume while retaining all key meaning.
+2. BULLETS: Return 2 to 3 clear, punchy, bite-sized bullet points (6th grade reading level).
+3. Do NOT include markdown code fences or conversational intro.
+
+Return strictly valid JSON:
+{
+  "bulletPoints": ["Concise point 1", "Concise point 2"],
+  "estimatedTimeSavedMinutes": ${Math.max(1, Math.round(originalWordCount / 140))},
+  "originalWordCount": ${originalWordCount},
+  "targetWordCount": ${targetWordCount}
+}`;
+
+        try {
+            const parsed = await callGeminiApi(prompt);
+            const pointsList = Array.isArray(parsed?.bulletPoints) && parsed.bulletPoints.length > 0
+                ? parsed.bulletPoints
+                : [targetSingleText];
+            const bullets = pointsList.join('\n• ');
+            const result = {
+                success: true,
+                simplifiedText: `• ${bullets}`,
+                bulletPoints: pointsList,
+                simplifiedParagraphs: [pointsList],
+                readingTimeSavedMinutes: parsed?.estimatedTimeSavedMinutes || 1,
+                originalWordCount,
+                targetWordCount,
+                cached: false
+            };
+
+            await setCachedSimplification(targetSingleText, result);
+            return result;
+        } catch (err) {
+            console.warn('[Lucent ServiceWorker] AI single text simplify failed:', err);
+            return {
+                success: false,
+                error: err?.message || 'Gemini simplify failed',
+                simplifiedText: `• ${targetSingleText.slice(0, 200)}...`
+            };
+        }
+    }
+
+    // Batch paragraphs (> 1)
+    if (Array.isArray(paragraphs) && paragraphs.length > 1) {
+        const results = [];
+        const uncachedIndices = [];
+        const uncachedParagraphs = [];
+
+        for (let i = 0; i < paragraphs.length; i++) {
+            const p = paragraphs[i];
+            const cached = await getCachedSimplification(p);
+            if (cached && (cached.bulletPoints || cached.simplifiedParagraphs?.[0])) {
+                results[i] = cached.bulletPoints || cached.simplifiedParagraphs[0];
+            } else {
+                results[i] = null;
+                uncachedIndices.push(i);
+                const wCount = p.trim().split(/\s+/).filter(Boolean).length;
+                uncachedParagraphs.push({
+                    index: i,
+                    originalWords: wCount,
+                    targetWords: Math.max(8, Math.round(wCount / 3)),
+                    text: p.slice(0, 800)
+                });
+            }
+        }
+
+        if (uncachedParagraphs.length === 0) {
+            console.log('[Lucent ServiceWorker] All batch paragraphs retrieved from cache');
+            return {
+                success: true,
+                simplifiedParagraphs: results,
+                readingTimeSavedMinutes: Math.max(1, Math.round(paragraphs.length * 0.8)),
+                cached: true
+            };
+        }
+
+        const prompt = `You are an assistive cognitive AI specialized in reducing reading fatigue for neurodivergent readers.
+For each numbered paragraph below, write 2 concise bullet points that are strictly ONE-THIRD (1/3) the length of that original paragraph.
 
 Paragraphs to simplify:
-${JSON.stringify(paragraphs.slice(0, 15).map((p, i) => ({ index: i, text: p.slice(0, 800) })), null, 2)}
+${JSON.stringify(uncachedParagraphs.slice(0, 15), null, 2)}
 
 Return strictly valid JSON:
 {
@@ -120,55 +293,38 @@ Return strictly valid JSON:
             const parsed = await callGeminiApi(prompt);
             const simplifiedMap = {};
             if (Array.isArray(parsed?.simplified)) {
-                parsed.simplified.forEach(item => {
+                for (const item of parsed.simplified) {
                     if (typeof item.index === 'number' && Array.isArray(item.bullets)) {
                         simplifiedMap[item.index] = item.bullets;
+                        const origText = paragraphs[item.index];
+                        if (origText) {
+                            const words = origText.trim().split(/\s+/).filter(Boolean);
+                            await setCachedSimplification(origText, {
+                                success: true,
+                                bulletPoints: item.bullets,
+                                simplifiedParagraphs: [item.bullets],
+                                originalWordCount: words.length,
+                                targetWordCount: Math.max(8, Math.round(words.length / 3))
+                            });
+                        }
                     }
-                });
+                }
             }
-            const results = paragraphs.map((p, i) => simplifiedMap[i] || null);
+            for (const idx of uncachedIndices) {
+                results[idx] = simplifiedMap[idx] || null;
+            }
             return {
                 success: true,
                 simplifiedParagraphs: results,
-                readingTimeSavedMinutes: parsed?.estimatedTimeSavedMinutes || Math.max(1, Math.round(paragraphs.length * 0.8))
+                readingTimeSavedMinutes: parsed?.estimatedTimeSavedMinutes || Math.max(1, Math.round(paragraphs.length * 0.8)),
+                cached: false
             };
         } catch (err) {
-            console.warn('[Lucent ServiceWorker] AI simplify failed:', err);
+            console.warn('[Lucent ServiceWorker] AI simplify batch failed:', err);
             return {
                 success: false,
                 error: err?.message || 'Gemini simplify failed',
-                simplifiedParagraphs: null
-            };
-        }
-    }
-
-    if (singleText) {
-        const prompt = `Rewrite the following text into 3-4 clear, bite-sized bullet points using plain, simple language for neurodivergent readers:
-${singleText.slice(0, 1500)}
-
-Return strictly valid JSON:
-{
-  "bulletPoints": ["Point 1", "Point 2", "Point 3"],
-  "estimatedTimeSavedMinutes": 2
-}`;
-
-        try {
-            const parsed = await callGeminiApi(prompt);
-            const bullets = Array.isArray(parsed?.bulletPoints) ? parsed.bulletPoints.join('\n• ') : singleText;
-            const pointsList = Array.isArray(parsed?.bulletPoints) ? parsed.bulletPoints : [singleText];
-            return {
-                success: true,
-                simplifiedText: `• ${bullets}`,
-                bulletPoints: pointsList,
-                simplifiedParagraphs: [pointsList],
-                readingTimeSavedMinutes: parsed?.estimatedTimeSavedMinutes || 1
-            };
-        } catch (err) {
-            console.warn('[Lucent ServiceWorker] AI single text simplify failed:', err);
-            return {
-                success: false,
-                error: err?.message || 'Gemini simplify failed',
-                simplifiedText: `• ${singleText.slice(0, 200)}...`
+                simplifiedParagraphs: results
             };
         }
     }

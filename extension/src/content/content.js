@@ -226,20 +226,31 @@ let simplifiedCardsList = [];
 
 function generateLocalExtractiveBullets(text) {
   if (!text || text.trim().length === 0) return ['Summary unavailable'];
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const targetWords = Math.max(12, Math.round(words.length / 3));
+
   const sentences = text
     .replace(/\s+/g, ' ')
     .split(/(?<=[.?!])\s+/)
     .map(s => s.trim())
-    .filter(s => s.length >= 25);
+    .filter(s => s.length >= 15);
 
-  if (sentences.length <= 2) {
-    return sentences.length > 0 ? sentences : [text.slice(0, 160)];
+  if (sentences.length <= 1) {
+    return [words.slice(0, targetWords).join(' ') + (words.length > targetWords ? '...' : '')];
   }
-  return [
-    sentences[0],
-    sentences[Math.floor(sentences.length / 2)],
-    sentences[sentences.length - 1]
-  ].slice(0, 3);
+
+  const selected = [];
+  let currentWords = 0;
+  for (const s of sentences) {
+    const sLen = s.split(/\s+/).length;
+    if (currentWords + sLen <= targetWords * 1.25 || selected.length === 0) {
+      selected.push(s);
+      currentWords += sLen;
+      if (selected.length >= 3 || currentWords >= targetWords) break;
+    }
+  }
+
+  return selected.length > 0 ? selected : [sentences[0]];
 }
 
 async function simplifySelectedText(customText) {
@@ -258,6 +269,7 @@ async function simplifySelectedText(customText) {
   setSimplifyButtonState(true);
 
   let bullets = null;
+  let isCached = false;
   try {
     const aiResponse = await new Promise((resolve) => {
       chrome.runtime.sendMessage({
@@ -274,6 +286,7 @@ async function simplifySelectedText(customText) {
     });
 
     if (aiResponse && aiResponse.success) {
+      isCached = !!aiResponse.cached;
       if (Array.isArray(aiResponse.simplifiedParagraphs?.[0]) && aiResponse.simplifiedParagraphs[0].length > 0) {
         bullets = aiResponse.simplifiedParagraphs[0];
       } else if (Array.isArray(aiResponse.bulletPoints) && aiResponse.bulletPoints.length > 0) {
@@ -312,7 +325,13 @@ async function simplifySelectedText(customText) {
 
   card.innerHTML = `
     <div class="lucent-simplified-header">
-      <span class="lucent-simplified-tag"><span>✦</span> AI Plain Summary</span>
+      <span class="lucent-simplified-tag">
+        <span>✦</span> AI Plain Summary
+        ${isCached
+          ? '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(34,197,94,0.18);color:#10b981;font-weight:700;margin-left:6px;letter-spacing:0.3px;">⚡ CACHED</span>'
+          : '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(99,102,241,0.18);color:#818cf8;font-weight:700;margin-left:6px;letter-spacing:0.3px;">1/3 LENGTH</span>'
+        }
+      </span>
       <span class="lucent-simplified-action">Click to expand full text ↗</span>
     </div>
     <ul class="lucent-simplified-bullets">
@@ -352,10 +371,16 @@ async function simplifySelectedText(customText) {
   simplifiedCardsList.push(card);
   setSimplifyButtonState(false, true);
 
-  showLucentToast(`✨ Simplified selected text! Click card to toggle original.`);
+  if (isCached) {
+    showLucentToast('⚡ Instant AI summary loaded from cache (1/3 length)!');
+    flashSimplifyStatus('Cached ⚡');
+  } else {
+    showLucentToast('✨ Simplified into 1/3 length plain summary! Click card to toggle original.');
+    flashSimplifyStatus('Simplified! ✨');
+  }
   report(`AI simplified selected paragraph on ${document.title || location.hostname}`, 'Cognitive & ADHD');
 
-  return { count: 1, timeSaved: 1, success: true, text };
+  return { count: 1, timeSaved: 1, success: true, text, cached: isCached };
 }
 
 async function simplifyActivePage() {
