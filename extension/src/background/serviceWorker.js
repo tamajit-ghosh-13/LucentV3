@@ -155,9 +155,12 @@ Return strictly valid JSON:
         try {
             const parsed = await callGeminiApi(prompt);
             const bullets = Array.isArray(parsed?.bulletPoints) ? parsed.bulletPoints.join('\n• ') : singleText;
+            const pointsList = Array.isArray(parsed?.bulletPoints) ? parsed.bulletPoints : [singleText];
             return {
                 success: true,
                 simplifiedText: `• ${bullets}`,
+                bulletPoints: pointsList,
+                simplifiedParagraphs: [pointsList],
                 readingTimeSavedMinutes: parsed?.estimatedTimeSavedMinutes || 1
             };
         } catch (err) {

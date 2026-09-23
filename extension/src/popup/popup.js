@@ -329,6 +329,7 @@ if (popupSpeakBtn) {
       chrome.tabs.sendMessage(tab.id, { type: 'LUCENT_GET_SELECTION' }, response => {
         if (chrome.runtime.lastError) return;
         updatePopupSpeechUI(response?.isSpeaking, response?.text);
+        updatePopupSimplifyUI(response?.text);
       });
     }
   });
@@ -339,6 +340,41 @@ const popupSimplifyBtn = document.getElementById('popup-simplify-btn');
 const popupRestoreBtn = document.getElementById('popup-restore-btn');
 const popupSimplifyBadge = document.getElementById('popup-simplify-badge');
 const popupSimplifyStatus = document.getElementById('popup-simplify-status');
+const popupSimplifyPreview = document.getElementById('popup-simplify-preview');
+
+function updatePopupSimplifyUI(text) {
+  if (!popupSimplifyBtn) return;
+  if (text) {
+    const words = text.split(/\s+/).filter(Boolean).length;
+    popupSimplifyBtn.style.background = '#22c55e';
+    popupSimplifyBtn.style.color = '#042b12';
+    popupSimplifyBtn.style.borderColor = '#4ade80';
+    popupSimplifyBtn.innerHTML = '<span>✨</span> Simplify Selected Text';
+    if (popupSimplifyBadge) {
+      popupSimplifyBadge.textContent = `${words} word${words === 1 ? '' : 's'}`;
+      popupSimplifyBadge.style.color = '#4ade80';
+      popupSimplifyBadge.style.background = 'rgba(34, 197, 94, 0.2)';
+    }
+    if (popupSimplifyPreview) {
+      popupSimplifyPreview.style.display = 'block';
+      const snippet = text.length > 36 ? text.slice(0, 36) + '...' : text;
+      popupSimplifyPreview.textContent = `Selected: "${snippet}"`;
+    }
+  } else {
+    popupSimplifyBtn.style.background = '#1d3d2b';
+    popupSimplifyBtn.style.color = '#8df4b5';
+    popupSimplifyBtn.style.borderColor = '#3c8055';
+    popupSimplifyBtn.innerHTML = '<span>✨</span> Simplify Selected Text';
+    if (popupSimplifyBadge) {
+      popupSimplifyBadge.textContent = 'Ready';
+      popupSimplifyBadge.style.color = '#8bb799';
+      popupSimplifyBadge.style.background = 'rgba(34, 197, 94, 0.15)';
+    }
+    if (popupSimplifyPreview) {
+      popupSimplifyPreview.style.display = 'none';
+    }
+  }
+}
 
 if (popupSimplifyBtn) {
   popupSimplifyBtn.addEventListener('click', async () => {
@@ -346,39 +382,35 @@ if (popupSimplifyBtn) {
     if (!tab?.id) return;
 
     popupSimplifyBtn.disabled = true;
-    popupSimplifyBtn.innerHTML = '<span>✨</span> Summarizing with AI...';
+    popupSimplifyBtn.innerHTML = '<span>✨</span> Simplifying with AI...';
     if (popupSimplifyBadge) {
-      popupSimplifyBadge.textContent = 'Processing...';
+      popupSimplifyBadge.textContent = 'Thinking...';
       popupSimplifyBadge.style.color = '#fbbf24';
-    }
-    if (popupSimplifyStatus) {
-      popupSimplifyStatus.style.display = 'block';
-      popupSimplifyStatus.textContent = 'Extracting and simplifying reading paragraphs...';
     }
 
     chrome.tabs.sendMessage(tab.id, { type: 'SIMPLIFY_PAGE_AI' }, response => {
       popupSimplifyBtn.disabled = false;
-      popupSimplifyBtn.innerHTML = '<span>✨</span> Simplify Paragraphs with AI';
+      popupSimplifyBtn.innerHTML = '<span>✨</span> Simplify Selected Text';
 
       if (response && response.count > 0) {
         if (popupSimplifyBadge) {
-          popupSimplifyBadge.textContent = `${response.count} simplified`;
+          popupSimplifyBadge.textContent = `Simplified! ✓`;
           popupSimplifyBadge.style.color = '#4ade80';
         }
         if (popupSimplifyStatus) {
           popupSimplifyStatus.style.display = 'block';
-          popupSimplifyStatus.textContent = `Summarized ${response.count} paragraphs (~${response.timeSaved || 2} min saved). Click any card on page to view original.`;
+          popupSimplifyStatus.textContent = `Paragraph simplified into plain-language bullets. Click card on page to view original.`;
         }
         if (popupRestoreBtn) popupRestoreBtn.style.display = 'flex';
-        recordEvent(`AI simplified ${response.count} paragraphs on active tab`, 'Cognitive & ADHD');
+        recordEvent(`AI simplified selected paragraph on active tab`, 'Cognitive & ADHD');
       } else {
         if (popupSimplifyBadge) {
-          popupSimplifyBadge.textContent = 'No text found';
-          popupSimplifyBadge.style.color = '#8aa695';
+          popupSimplifyBadge.textContent = 'Select text 👆';
+          popupSimplifyBadge.style.color = '#f87171';
         }
         if (popupSimplifyStatus) {
           popupSimplifyStatus.style.display = 'block';
-          popupSimplifyStatus.textContent = 'No suitable long reading paragraphs found on this page.';
+          popupSimplifyStatus.textContent = 'Please highlight text or a paragraph on the page first.';
         }
       }
     });

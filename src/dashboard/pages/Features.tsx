@@ -82,7 +82,7 @@ const disorderGroups: DisorderGroup[] = [
         description: 'Condenses dense, overwhelming paragraphs into bite-sized plain-language bullet points powered by Gemini AI. Click any card to expand full text.',
         category: 'Cognitive Retention',
         benefit: 'Saves 60%+ reading time and eliminates wall-of-text fatigue',
-        howItWorks: 'Batches reading paragraphs through Gemini AI plain-language summarization with instant click-to-expand drawers'
+        howItWorks: 'Highlight any text or dense paragraph on the page to instantly simplify it with Gemini AI into plain-language bullet points'
       }
     ]
   },

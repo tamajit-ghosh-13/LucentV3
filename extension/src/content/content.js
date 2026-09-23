@@ -21,6 +21,7 @@ let crosshairH, crosshairV;
 let magnifier;
 let speechActiveEl;
 let currentSelectedText = '';
+let currentSelectedBlockEl = null;
 let isSpeaking = false;
 
 // Catch extension context invalidation globally
@@ -241,41 +242,28 @@ function generateLocalExtractiveBullets(text) {
   ].slice(0, 3);
 }
 
-async function simplifyActivePage() {
+async function simplifySelectedText(customText) {
   if (isDashboard()) return { count: 0, reason: 'dashboard' };
 
-  // If already simplified, return current count
-  const existingCards = document.querySelectorAll('.lucent-simplified-card');
-  if (existingCards.length > 0) {
-    return { count: existingCards.length, timeSaved: Math.round(existingCards.length * 0.8) };
+  const sel = window.getSelection()?.toString().trim();
+  const text = customText || sel || currentSelectedText;
+
+  if (!text) {
+    showLucentToast('Highlight text on the page first! 👆');
+    flashSimplifyStatus('Select text first! 👆');
+    return { count: 0, reason: 'no_selection' };
   }
 
-  // Find candidate reading paragraphs
-  const candidates = Array.from(
-    document.querySelectorAll('article p, main p, [role="main"] p, [role="article"] p, .mw-parser-output > p, #content p, section p, p')
-  );
+  showLucentToast(`✨ Gemini AI simplifying selected text...`);
+  setSimplifyButtonState(true);
 
-  const targetParagraphs = candidates.filter(p => {
-    if (p.closest('#lucent-widget') || p.closest('.lucent-simplified-card')) return false;
-    if (p.closest('nav, footer, header, form, code, pre, table, aside, figcaption')) return false;
-    const txt = p.textContent?.trim() || '';
-    return txt.length >= 110;
-  }).slice(0, 12);
-
-  if (targetParagraphs.length === 0) {
-    return { count: 0, reason: 'no_paragraphs' };
-  }
-
-  showLucentToast(`✨ Gemini AI analyzing ${targetParagraphs.length} paragraphs...`);
-
-  const paragraphsText = targetParagraphs.map(p => p.textContent.trim());
-  let simplifiedData = null;
-
+  let bullets = null;
   try {
     const aiResponse = await new Promise((resolve) => {
       chrome.runtime.sendMessage({
         type: 'LUCENT_AI_SIMPLIFY',
-        paragraphs: paragraphsText
+        paragraphs: [text],
+        text: text
       }, (res) => {
         if (chrome.runtime.lastError) {
           resolve(null);
@@ -285,73 +273,99 @@ async function simplifyActivePage() {
       });
     });
 
-    if (aiResponse && aiResponse.success && aiResponse.simplifiedParagraphs) {
-      simplifiedData = aiResponse;
+    if (aiResponse && aiResponse.success) {
+      if (Array.isArray(aiResponse.simplifiedParagraphs?.[0]) && aiResponse.simplifiedParagraphs[0].length > 0) {
+        bullets = aiResponse.simplifiedParagraphs[0];
+      } else if (Array.isArray(aiResponse.bulletPoints) && aiResponse.bulletPoints.length > 0) {
+        bullets = aiResponse.bulletPoints;
+      }
     }
   } catch (err) {
-    console.warn('[Lucent] AI simplify request error, using fast local extractive summarizer', err);
+    console.warn('[Lucent] AI simplify request error, using fallback extractor', err);
   }
 
-  let count = 0;
-  simplifiedCardsList = [];
+  if (!bullets || bullets.length === 0) {
+    bullets = generateLocalExtractiveBullets(text);
+  }
 
-  targetParagraphs.forEach((p, index) => {
-    let bullets = null;
-    if (simplifiedData?.simplifiedParagraphs && Array.isArray(simplifiedData.simplifiedParagraphs[index])) {
-      bullets = simplifiedData.simplifiedParagraphs[index];
-    } else {
-      bullets = generateLocalExtractiveBullets(p.textContent);
+  // Identify target block element to mount the simplified card
+  let targetEl = currentSelectedBlockEl;
+  if (!targetEl || targetEl.closest('#lucent-widget') || !document.body.contains(targetEl)) {
+    const selObj = window.getSelection();
+    if (selObj && selObj.anchorNode) {
+      const node = selObj.anchorNode;
+      const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+      targetEl = el?.closest('p, blockquote, li, article, section, div, h1, h2, h3, h4, h5, h6');
     }
+  }
 
-    if (!bullets || bullets.length === 0) {
-      bullets = generateLocalExtractiveBullets(p.textContent);
-    }
+  const card = document.createElement('div');
+  card.className = 'lucent-simplified-card';
+  card.setAttribute('data-lucent-simplified', 'true');
 
-    const card = document.createElement('div');
-    card.className = 'lucent-simplified-card';
-    card.setAttribute('data-lucent-simplified', 'true');
-    card.setAttribute('data-lucent-original-html', encodeURIComponent(p.outerHTML));
+  const bulletsHtml = bullets
+    .map(b => `<li>${String(b).replace(/^[•\-\*]\s*/, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</li>`)
+    .join('');
 
-    const bulletsHtml = bullets
-      .map(b => `<li>${String(b).replace(/^[•\-\*]\s*/, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</li>`)
-      .join('');
+  const originalHtml = targetEl ? targetEl.outerHTML : `<p>${text}</p>`;
+  card.setAttribute('data-lucent-original-html', encodeURIComponent(originalHtml));
 
-    card.innerHTML = `
-      <div class="lucent-simplified-header">
-        <span class="lucent-simplified-tag"><span>✦</span> AI Plain Summary</span>
-        <span class="lucent-simplified-action">Click to expand full text ↗</span>
-      </div>
-      <ul class="lucent-simplified-bullets">
-        ${bulletsHtml}
-      </ul>
-      <div class="lucent-original-drawer" hidden>
-        <div class="lucent-original-label">Original Full Text</div>
-        <div class="lucent-original-body">${p.innerHTML}</div>
-      </div>
-    `;
+  card.innerHTML = `
+    <div class="lucent-simplified-header">
+      <span class="lucent-simplified-tag"><span>✦</span> AI Plain Summary</span>
+      <span class="lucent-simplified-action">Click to expand full text ↗</span>
+    </div>
+    <ul class="lucent-simplified-bullets">
+      ${bulletsHtml}
+    </ul>
+    <div class="lucent-original-drawer" hidden>
+      <div class="lucent-original-label">Original Full Text</div>
+      <div class="lucent-original-body">${targetEl ? targetEl.innerHTML : text}</div>
+    </div>
+  `;
 
-    // Interactive card toggle: clicking switches between summary & original
-    card.addEventListener('click', (e) => {
-      if (e.target.closest('a')) return;
-      const drawer = card.querySelector('.lucent-original-drawer');
-      const bulletsUl = card.querySelector('.lucent-simplified-bullets');
-      const action = card.querySelector('.lucent-simplified-action');
-      const isShowingOriginal = !drawer.hidden;
-      drawer.hidden = isShowingOriginal;
-      bulletsUl.hidden = !isShowingOriginal;
-      action.textContent = isShowingOriginal ? 'Click to expand full text ↗' : 'Click to show summary ↙';
-    });
-
-    p.replaceWith(card);
-    simplifiedCardsList.push(card);
-    count++;
+  // Interactive card toggle: clicking switches between summary & original
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('a')) return;
+    const drawer = card.querySelector('.lucent-original-drawer');
+    const bulletsUl = card.querySelector('.lucent-simplified-bullets');
+    const action = card.querySelector('.lucent-simplified-action');
+    const isShowingOriginal = !drawer.hidden;
+    drawer.hidden = isShowingOriginal;
+    bulletsUl.hidden = !isShowingOriginal;
+    action.textContent = isShowingOriginal ? 'Click to expand full text ↗' : 'Click to show summary ↙';
   });
 
-  const timeSaved = Math.max(1, Math.round(count * 0.8));
-  showLucentToast(`✨ AI simplified ${count} paragraphs (~${timeSaved} min saved)`);
-  report(`AI simplified ${count} paragraphs on ${document.title || location.hostname}`, 'Cognitive & ADHD');
+  if (targetEl && targetEl.parentElement && !targetEl.closest('#lucent-widget')) {
+    targetEl.replaceWith(card);
+  } else {
+    const selObj = window.getSelection();
+    if (selObj && selObj.rangeCount > 0) {
+      const range = selObj.getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(card);
+    } else {
+      document.body.appendChild(card);
+    }
+  }
 
-  return { count, timeSaved, success: true };
+  simplifiedCardsList.push(card);
+  setSimplifyButtonState(false, true);
+
+  showLucentToast(`✨ Simplified selected text! Click card to toggle original.`);
+  report(`AI simplified selected paragraph on ${document.title || location.hostname}`, 'Cognitive & ADHD');
+
+  return { count: 1, timeSaved: 1, success: true, text };
+}
+
+async function simplifyActivePage() {
+  const sel = window.getSelection()?.toString().trim() || currentSelectedText;
+  if (sel) {
+    return simplifySelectedText(sel);
+  }
+  showLucentToast('Highlight text on the page first! 👆');
+  flashSimplifyStatus('Select text first! 👆');
+  return { count: 0, reason: 'no_selection' };
 }
 
 function restoreActivePage() {
@@ -918,6 +932,99 @@ function stopSpeech() {
   }
   isSpeaking = false;
   updateSpeechButtonUI();
+}
+
+function updateSimplifyButtonUI() {
+  if (!lucentWidgetRoot) return;
+  const simplifyBtn = lucentWidgetRoot.querySelector('.widget-simplify-btn');
+  const badge = lucentWidgetRoot.querySelector('.widget-simplify-badge');
+  const preview = lucentWidgetRoot.querySelector('.widget-simplify-preview');
+  const restoreBtn = lucentWidgetRoot.querySelector('.widget-restore-btn');
+  if (!simplifyBtn) return;
+
+  const count = document.querySelectorAll('.lucent-simplified-card').length;
+  if (restoreBtn) {
+    restoreBtn.style.display = count > 0 ? 'flex' : 'none';
+  }
+
+  const selText = window.getSelection()?.toString().trim() || currentSelectedText;
+  if (selText) {
+    const words = selText.split(/\s+/).filter(Boolean).length;
+    simplifyBtn.style.background = '#22c55e';
+    simplifyBtn.style.color = '#042b12';
+    simplifyBtn.style.borderColor = '#4ade80';
+    simplifyBtn.innerHTML = '<span>✨</span> Simplify Selected Text';
+    if (badge) {
+      badge.textContent = `${words} word${words === 1 ? '' : 's'}`;
+      badge.style.color = '#4ade80';
+      badge.style.background = 'rgba(34, 197, 94, 0.2)';
+      badge.style.borderColor = 'rgba(74, 222, 128, 0.4)';
+    }
+    if (preview) {
+      preview.style.display = 'block';
+      const snippet = selText.length > 36 ? selText.slice(0, 36) + '...' : selText;
+      preview.textContent = `Selected: "${snippet}"`;
+    }
+  } else {
+    simplifyBtn.style.background = '#152e20';
+    simplifyBtn.style.color = '#8df4b5';
+    simplifyBtn.style.borderColor = '#3c8055';
+    simplifyBtn.innerHTML = '<span>✨</span> Simplify Selected Text';
+    if (badge) {
+      badge.textContent = count > 0 ? `${count} simplified` : 'Ready';
+      badge.style.color = '#8bb799';
+      badge.style.background = 'rgba(34, 197, 94, 0.15)';
+      badge.style.borderColor = 'rgba(74, 222, 128, 0.25)';
+    }
+    if (preview) {
+      preview.style.display = 'none';
+    }
+  }
+}
+
+function flashSimplifyStatus(msg) {
+  if (!lucentWidgetRoot) return;
+  const badge = lucentWidgetRoot.querySelector('.widget-simplify-badge');
+  if (!badge) return;
+  badge.textContent = msg;
+  badge.style.color = '#fde047';
+  badge.style.background = 'rgba(234, 179, 8, 0.2)';
+  badge.style.borderColor = '#eab308';
+  setTimeout(() => {
+    updateSimplifyButtonUI();
+  }, 2200);
+}
+
+function setSimplifyButtonState(loading, done) {
+  if (!lucentWidgetRoot) return;
+  const btn = lucentWidgetRoot.querySelector('.widget-simplify-btn');
+  const badge = lucentWidgetRoot.querySelector('.widget-simplify-badge');
+  const restoreBtn = lucentWidgetRoot.querySelector('.widget-restore-btn');
+  if (restoreBtn) restoreBtn.style.display = 'flex';
+
+  if (!btn) return;
+  if (loading) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>✨</span> Simplifying with AI...';
+    if (badge) {
+      badge.textContent = 'Processing...';
+      badge.style.color = '#fbbf24';
+    }
+  } else if (done) {
+    btn.disabled = false;
+    btn.innerHTML = '<span>✓</span> Simplified!';
+    btn.style.background = '#059669';
+    if (badge) {
+      badge.textContent = 'Simplified! ✓';
+      badge.style.color = '#4ade80';
+    }
+    setTimeout(() => {
+      updateSimplifyButtonUI();
+    }, 2500);
+  } else {
+    btn.disabled = false;
+    updateSimplifyButtonUI();
+  }
 }
 
 function assignShortcuts() {
@@ -1617,16 +1724,17 @@ function rebuildWidgetOptions() {
       <div class="widget-simplify-control" style="background: #112217; border: 1px solid #20442c; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
           <span style="font-weight: 700; font-size: 12px; color: #ecfff3; display: flex; align-items: center; gap: 5px;">
-            <span>✨</span> AI Text Simplifier
+            <span>✨</span> AI Simplifier
           </span>
           <span class="widget-simplify-badge" style="font-size: 10px; color: #8bb799; background: rgba(34, 197, 94, 0.15); padding: 1px 7px; border-radius: 999px; border: 1px solid rgba(74, 222, 128, 0.25);">Ready</span>
         </div>
         <button type="button" class="widget-simplify-btn" style="width: 100%; background: #152e20; color: #8df4b5; border: 1px solid #3c8055; border-radius: 6px; padding: 6px 10px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.15s ease;">
-          <span>✨</span> Simplify Paragraphs with AI
+          <span>✨</span> Simplify Selected Text
         </button>
         <button type="button" class="widget-restore-btn" style="width: 100%; background: #1f2b23; color: #a8cbb4; border: 1px solid #324e3c; border-radius: 6px; padding: 5px 8px; font-size: 11px; font-weight: 600; cursor: pointer; display: none; align-items: center; justify-content: center; gap: 5px; margin-top: 5px; transition: all 0.15s ease;">
           <span>↩</span> Restore Original Text
         </button>
+        <div class="widget-simplify-preview" style="font-size: 10px; color: #7cb28e; margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: none;"></div>
         <div class="widget-simplify-status" style="font-size: 10px; color: #7cb28e; margin-top: 5px; display: none;"></div>
       </div>
     `;
@@ -1714,62 +1822,18 @@ function rebuildWidgetOptions() {
   const simplifyStatus = optionsContainer.querySelector('.widget-simplify-status');
 
   if (simplifyBtn) {
-    simplifyBtn.addEventListener('click', async (event) => {
+    simplifyBtn.addEventListener('click', (event) => {
       event.stopPropagation();
-      simplifyBtn.disabled = true;
-      simplifyBtn.innerHTML = '<span>✨</span> Summarizing with AI...';
-      if (simplifyBadge) {
-        simplifyBadge.textContent = 'Processing...';
-        simplifyBadge.style.color = '#fbbf24';
-      }
-      if (simplifyStatus) {
-        simplifyStatus.style.display = 'block';
-        simplifyStatus.textContent = 'Extracting and simplifying reading paragraphs...';
-      }
-      try {
-        const result = await simplifyActivePage();
-        if (result && result.count > 0) {
-          if (simplifyBadge) {
-            simplifyBadge.textContent = `${result.count} simplified`;
-            simplifyBadge.style.color = '#4ade80';
-          }
-          if (simplifyStatus) {
-            simplifyStatus.style.display = 'block';
-            simplifyStatus.textContent = `Summarized ${result.count} paragraphs (~${result.timeSaved || 2} min saved). Click any card to view original.`;
-          }
-          if (restoreBtn) restoreBtn.style.display = 'flex';
-        } else {
-          if (simplifyBadge) {
-            simplifyBadge.textContent = 'No text found';
-            simplifyBadge.style.color = '#8aa695';
-          }
-          if (simplifyStatus) {
-            simplifyStatus.style.display = 'block';
-            simplifyStatus.textContent = 'No suitable long reading paragraphs found on this page.';
-          }
-        }
-      } catch (err) {
-        if (simplifyBadge) {
-          simplifyBadge.textContent = 'Error';
-          simplifyBadge.style.color = '#f87171';
-        }
-      } finally {
-        simplifyBtn.disabled = false;
-        simplifyBtn.innerHTML = '<span>✨</span> Simplify Paragraphs with AI';
-      }
+      simplifySelectedText();
     });
+    updateSimplifyButtonUI();
   }
 
-  if (restoreBtn) {
     restoreBtn.addEventListener('click', (event) => {
       event.stopPropagation();
       restoreActivePage();
       restoreBtn.style.display = 'none';
-      if (simplifyBadge) {
-        simplifyBadge.textContent = 'Ready';
-        simplifyBadge.style.color = '#8bb799';
-      }
-      if (simplifyStatus) simplifyStatus.style.display = 'none';
+      updateSimplifyButtonUI();
     });
   }
 
@@ -2235,24 +2299,24 @@ async function init() {
   // Non-dashboard pages: attach normal accessibility listeners
   document.addEventListener('keydown', handleKeyDown, true);
   document.addEventListener('click', blockRepeatActivation, true);
-  document.addEventListener('selectionchange', () => {
+  function handleSelectionUpdate() {
     if (isDashboard()) return;
     const sel = window.getSelection();
     const text = sel ? sel.toString().trim() : '';
     if (text) {
       currentSelectedText = text;
+      try {
+        const anchor = sel.anchorNode;
+        const el = anchor?.nodeType === Node.ELEMENT_NODE ? anchor : anchor?.parentElement;
+        currentSelectedBlockEl = el?.closest('p, blockquote, li, article, section, h1, h2, h3, h4, h5, h6, [role="article"]') || el;
+      } catch (_) {}
     }
     updateSpeechButtonUI();
-  });
-  document.addEventListener('mouseup', () => {
-    if (isDashboard()) return;
-    const sel = window.getSelection();
-    const text = sel ? sel.toString().trim() : '';
-    if (text) {
-      currentSelectedText = text;
-      updateSpeechButtonUI();
-    }
-  });
+    updateSimplifyButtonUI();
+  }
+
+  document.addEventListener('selectionchange', handleSelectionUpdate);
+  document.addEventListener('mouseup', handleSelectionUpdate);
 
   const stored = await safeStorageGet([settingsKey, 'lucentEvents']);
   if (!stored || !isExtensionValid()) return;
