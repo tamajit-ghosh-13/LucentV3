@@ -94,7 +94,7 @@ Return strictly valid JSON with the following structure (no markdown fences, no 
 `;
 
     const response = await client.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3.5-flash-lite',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -173,7 +173,7 @@ Return strictly valid JSON in this schema (no markdown, no extra commentary):
 }
 `;
       const response = await client.models.generateContent({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-3.5-flash-lite',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -228,7 +228,7 @@ Return JSON:
 `;
 
     const response = await client.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-3.5-flash-lite',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
