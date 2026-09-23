@@ -29,6 +29,7 @@ export interface MotorSettings {
   magneticGravity: boolean;
   holdToConfirm: boolean;
   motorAutopilotActive: boolean;
+  largeCursor: boolean;
 }
 
 export interface TelemetryLog {

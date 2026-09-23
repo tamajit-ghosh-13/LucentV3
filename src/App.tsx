@@ -63,7 +63,8 @@ export default function App() {
     dwellDelay: 750,
     magneticGravity: false,
     holdToConfirm: false,
-    motorAutopilotActive: false
+    motorAutopilotActive: false,
+    largeCursor: false
   });
   const [isAutopilotRunning, setIsAutopilotRunning] = useState(false);
 
@@ -150,7 +151,8 @@ export default function App() {
         dwellDelay: 750,
         magneticGravity: false,
         holdToConfirm: false,
-        motorAutopilotActive: false
+        motorAutopilotActive: false,
+        largeCursor: false
       });
       addTelemetryLog('DOM_PATCH', 'Reverted all dynamic DOM patches. Unprotected baseline exposed.', 'rose');
     } else if (profile === 'visual') {
@@ -188,7 +190,8 @@ export default function App() {
         dwellDelay: 750,
         magneticGravity: true,
         holdToConfirm: true,
-        motorAutopilotActive: false
+        motorAutopilotActive: false,
+        largeCursor: true
       });
       setVisual(prev => ({ ...prev, highContrast: false }));
       setCognitive(prev => ({ ...prev, declutter: false, simplifyText: false }));

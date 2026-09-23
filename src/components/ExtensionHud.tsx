@@ -369,6 +369,23 @@ export const ExtensionHud: React.FC<ExtensionHudProps> = ({
             />
           </div>
 
+          {/* Large High-Visibility Cursor */}
+          <div className="flex items-center justify-between py-1 border-b border-slate-800/50">
+            <div>
+              <span className="text-slate-300 block font-medium flex items-center gap-1.5">
+                <MousePointer size={12} className="text-amber-400" />
+                <span>Large High-Visibility Cursor</span>
+              </span>
+              <span className="text-[10px] text-slate-500">Enlarges mouse pointer to 38px with high-contrast amber border</span>
+            </div>
+            <input
+              type="checkbox"
+              checked={motor.largeCursor}
+              onChange={(e) => onUpdateMotor({ largeCursor: e.target.checked })}
+              className="w-4 h-4 rounded accent-amber-500 cursor-pointer"
+            />
+          </div>
+
           <div className="flex items-center justify-between py-1 border-b border-slate-800/50">
             <div>
               <span className="text-slate-300 block font-medium">High-Visibility Tab Halo & Numbered Shortcuts</span>

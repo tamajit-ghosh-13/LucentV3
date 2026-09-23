@@ -241,7 +241,7 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
   return (
     <div 
       onMouseMove={handleMouseMove}
-      className={`min-h-full transition-colors duration-300 p-4 sm:p-8 ${bgMain} ${isDyslexic ? 'font-dyslexic' : 'font-sans'} relative`}
+      className={`min-h-full transition-colors duration-300 p-4 sm:p-8 ${bgMain} ${isDyslexic ? 'font-dyslexic' : 'font-sans'} ${motor.largeCursor ? 'large-cursor-active' : ''} relative`}
       style={containerStyle}
     >
       {/* Steady Click Visual Stabilization Ripple Effect */}
@@ -1088,6 +1088,12 @@ export const TargetPortal: React.FC<TargetPortalProps> = ({
             <span className="bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
               <ShieldCheck size={11} />
               <span>Spasm Hold Guard Active</span>
+            </span>
+          )}
+          {motor.largeCursor && (
+            <span className="bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded text-[10px] flex items-center gap-1">
+              <MousePointer2 size={11} />
+              <span>Large Cursor Active (38px)</span>
             </span>
           )}
         </div>
