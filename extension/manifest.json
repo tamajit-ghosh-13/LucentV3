@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Lucent",
+  "version": "1.1.0",
+  "description": "A reversible, user-controlled accessibility layer for the web.",
+
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "Lucent",
+    "default_icon": "icons/grey.png"
+  },
+
+  "icons": {
+    "16": "icons/green.png",
+    "48": "icons/green.png",
+    "128": "icons/accessibility_24dp_E3E3E3_FILL0_wght400_GRAD0_opsz24.png"
+  },
+
+  "background": {
+    "service_worker": "src/background/serviceWorker.js"
+  },
+
+  "host_permissions": [
+    "<all_urls>"
+  ],
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/content.js"],
+      "css": ["src/content/content.css"],
+      "all_frames": true,
+      "run_at": "document_idle"
+    }
+  ]
+}

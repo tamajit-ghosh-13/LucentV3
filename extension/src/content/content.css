@@ -1,0 +1,768 @@
+#lucent-widget {
+  all: initial !important;
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  display: block !important;
+}
+#lucent-widget:not(.lucent-dragged) {
+  right: 20px !important;
+  bottom: 20px !important;
+}
+#lucent-widget.lucent-dragged {
+  right: auto !important;
+  bottom: auto !important;
+}
+
+/* Lucent cognitive + motor overlays: all selectors require a user-enabled class. */
+html.lucent-declutter aside,
+html.lucent-declutter [role="banner"],
+html.lucent-declutter [role="complementary"],
+html.lucent-declutter [aria-label*="advert" i],
+html.lucent-declutter [class*="advert" i],
+html.lucent-declutter [id*="advert" i],
+html.lucent-declutter [class*="sponsor" i],
+html.lucent-declutter [id*="sponsor" i],
+html.lucent-declutter [class*="cookie" i],
+html.lucent-declutter [id*="cookie" i],
+html.lucent-declutter [class*="popup" i]:not(#lucent-widget):not(#lucent-widget *),
+html.lucent-declutter [class*="newsletter" i] {
+  display: none !important;
+}
+
+html.lucent-dyslexia,
+html.lucent-dyslexia body,
+html.lucent-dyslexia p,
+html.lucent-dyslexia span,
+html.lucent-dyslexia a,
+html.lucent-dyslexia li,
+html.lucent-dyslexia h1,
+html.lucent-dyslexia h2,
+html.lucent-dyslexia h3,
+html.lucent-dyslexia h4,
+html.lucent-dyslexia h5,
+html.lucent-dyslexia h6,
+html.lucent-dyslexia div {
+  font-family: OpenDyslexic, "Comic Sans MS", "Segoe UI", Arial, sans-serif !important;
+  letter-spacing: .045em !important;
+  line-height: 1.75 !important;
+  word-spacing: .12em !important;
+}
+
+html.lucent-calm *,
+html.lucent-calm *::before,
+html.lucent-calm *::after {
+  animation-duration: .01ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: .01ms !important;
+  transition-delay: 0ms !important;
+  caret-color: auto !important;
+}
+html.lucent-calm video[autoplay],
+html.lucent-calm [class*="carousel" i],
+html.lucent-calm [class*="ticker" i] {
+  animation-play-state: paused !important;
+}
+
+html.lucent-reading-width p,
+html.lucent-reading-width li,
+html.lucent-reading-width article {
+  max-width: 70ch !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+html.lucent-motor-targets button:not(#lucent-widget *),
+html.lucent-motor-targets a:not(#lucent-widget *),
+html.lucent-motor-targets input:not(#lucent-widget *),
+html.lucent-motor-targets select:not(#lucent-widget *),
+html.lucent-motor-targets [role="button"]:not(#lucent-widget *) {
+  min-width: 48px !important;
+  min-height: 48px !important;
+  padding: 6px 10px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+html.lucent-focus *:focus,
+html.lucent-focus *:focus-visible {
+  outline: 4px solid #22c55e !important;
+  outline-offset: 4px !important;
+  box-shadow: 0 0 0 7px rgba(34, 197, 94, .35) !important;
+}
+
+html.lucent-large-cursor,
+html.lucent-large-cursor * {
+  cursor: default !important;
+}
+
+.lucent-large-cursor-dot {
+  position: fixed !important;
+  z-index: 2147483646 !important;
+  width: 32px !important;
+  height: 32px !important;
+  border: 3px solid #22c55e !important;
+  border-radius: 50% !important;
+  background: rgba(34, 197, 94, .25) !important;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, .7) !important;
+  pointer-events: none !important;
+  left: 0 !important;
+  top: 0 !important;
+  transform: translate(-100px, -100px);
+  will-change: transform !important;
+}
+
+[data-lucent-shortcut] {
+  position: relative !important;
+}
+[data-lucent-shortcut]::after {
+  content: attr(data-lucent-shortcut);
+  position: absolute;
+  z-index: 2147483647;
+  top: -9px;
+  left: -9px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #111827;
+  color: #fff;
+  border: 2px solid #86efac;
+  font: 700 12px/1 system-ui;
+  pointer-events: none;
+}
+
+.lucent-reading-guide {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483645 !important;
+  height: 70px !important;
+  background: rgba(251, 191, 36, .15) !important;
+  border-top: 3px solid rgba(251, 191, 36, .85) !important;
+  border-bottom: 3px solid rgba(251, 191, 36, .85) !important;
+  box-shadow: 0 0 25px rgba(251, 191, 36, .25) !important;
+  pointer-events: none !important;
+  will-change: transform !important;
+  transition: transform .04s ease-out !important;
+}
+
+[data-accessibility-issue] {
+  position: relative;
+}
+[data-accessibility-issue]::after {
+  content: '⚠️';
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  z-index: 2147483647;
+  pointer-events: none;
+}
+
+/* =====================================================
+   VISUAL IMPAIRMENT & LOW VISION STYLES
+   ===================================================== */
+
+/* Intelligent Solar High-Contrast Suite (WCAG AAA Yellow-on-Black) */
+html.lucent-high-contrast,
+html.lucent-high-contrast body {
+  background-color: #000000 !important;
+  color: #ffff00 !important;
+}
+
+/* 1. Deep OLED Canvas for Structural Layout Containers */
+html.lucent-high-contrast body,
+html.lucent-high-contrast main,
+html.lucent-high-contrast article,
+html.lucent-high-contrast section,
+html.lucent-high-contrast nav,
+html.lucent-high-contrast header,
+html.lucent-high-contrast footer,
+html.lucent-high-contrast aside,
+html.lucent-high-contrast [role="main"],
+html.lucent-high-contrast [role="region"],
+html.lucent-high-contrast [role="article"],
+html.lucent-high-contrast .mw-page-container,
+html.lucent-high-contrast .mw-body,
+html.lucent-high-contrast #content,
+html.lucent-high-contrast .vector-header-container,
+html.lucent-high-contrast .vector-sticky-header,
+html.lucent-high-contrast #mw-panel,
+html.lucent-high-contrast #mw-content-text {
+  background-color: #000000 !important;
+  color: #ffff00 !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+
+/* Overlay & Backdrop Safety: Transparent overlays must NEVER blackout the page */
+html.lucent-high-contrast [style*="pointer-events: none"],
+html.lucent-high-contrast .sfbg,
+html.lucent-high-contrast .sfbgg,
+html.lucent-high-contrast .UUbT9,
+html.lucent-high-contrast .appbar,
+html.lucent-high-contrast [class*="backdrop" i]:not([role="dialog"]),
+html.lucent-high-contrast [class*="overlay" i]:not([role="dialog"]):not(.lucent-reading-guide) {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* 2. Text & Typography Readability */
+html.lucent-high-contrast p,
+html.lucent-high-contrast li,
+html.lucent-high-contrast dt,
+html.lucent-high-contrast dd,
+html.lucent-high-contrast em,
+html.lucent-high-contrast strong,
+html.lucent-high-contrast b,
+html.lucent-high-contrast blockquote,
+html.lucent-high-contrast label:not(#lucent-widget *),
+html.lucent-high-contrast span:not(#lucent-widget *):not(a *):not(button *):not([data-lucent-mask-icon]):not([class*="icon"]),
+html.lucent-high-contrast [data-snippet],
+html.lucent-high-contrast .VwiC3b,
+html.lucent-high-contrast .s3v9rd {
+  color: #ffff00 !important;
+}
+
+/* Headings in Radiant Warm Gold */
+html.lucent-high-contrast h1,
+html.lucent-high-contrast h2,
+html.lucent-high-contrast h3,
+html.lucent-high-contrast h4,
+html.lucent-high-contrast h5,
+html.lucent-high-contrast h6,
+html.lucent-high-contrast [role="heading"],
+html.lucent-high-contrast .LC20lb {
+  color: #ffd700 !important;
+  border-bottom-color: #444400 !important;
+  font-weight: 700 !important;
+}
+
+/* 3. Radiant WCAG AAA Hyperlinks (Sky Blue with clear underlines) */
+html.lucent-high-contrast a:not(#lucent-widget *),
+html.lucent-high-contrast a:not(#lucent-widget *) *,
+html.lucent-high-contrast [role="link"]:not(#lucent-widget *),
+html.lucent-high-contrast [role="link"]:not(#lucent-widget *) * {
+  color: #38bdf8 !important;
+  text-decoration: underline !important;
+  text-decoration-thickness: 1.5px !important;
+  text-underline-offset: 3px !important;
+}
+
+html.lucent-high-contrast a:not(#lucent-widget *):hover,
+html.lucent-high-contrast a:not(#lucent-widget *):hover * {
+  color: #7dd3fc !important;
+  text-decoration: underline !important;
+}
+
+html.lucent-high-contrast a:not(#lucent-widget *):visited,
+html.lucent-high-contrast a:not(#lucent-widget *):visited * {
+  color: #c084fc !important;
+}
+
+/* Citations & Breadcrumbs in Lime Green */
+html.lucent-high-contrast cite,
+html.lucent-high-contrast .byrV5b,
+html.lucent-high-contrast .TbwUpd {
+  color: #a3e635 !important;
+  text-decoration: none !important;
+}
+
+/* 4. Elimination of Wireframe Boxes: Strictly Scope Borders */
+/* ONLY genuine bordered elements get high-contrast borders */
+html.lucent-high-contrast table,
+html.lucent-high-contrast th,
+html.lucent-high-contrast td,
+html.lucent-high-contrast hr,
+html.lucent-high-contrast pre,
+html.lucent-high-contrast code,
+html.lucent-high-contrast blockquote,
+html.lucent-high-contrast fieldset {
+  border-color: #555500 !important;
+}
+
+/* Force transparent layout elements to STAY transparent (Fixes TOC boxes) */
+html.lucent-high-contrast .vector-toc-link,
+html.lucent-high-contrast .vector-toc-list-item,
+html.lucent-high-contrast [class*="toc-link"],
+html.lucent-high-contrast nav a,
+html.lucent-high-contrast nav li,
+html.lucent-high-contrast ul:not(table *) > li,
+html.lucent-high-contrast ol:not(table *) > li {
+  border-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Clean accessible active indicator for TOC links */
+html.lucent-high-contrast .vector-toc-link:hover,
+html.lucent-high-contrast .vector-toc-list-item-active > .vector-toc-link {
+  background-color: #181818 !important;
+  border-left: 3px solid #ffd700 !important;
+  border-radius: 4px !important;
+  color: #ffffff !important;
+}
+
+/* Neutralize white fade-out gradient overlays (e.g. Wikipedia TOC bottom) */
+html.lucent-high-contrast .vector-toc::after,
+html.lucent-high-contrast [class*="fade-out"],
+html.lucent-high-contrast [class*="gradient-fade"],
+html.lucent-high-contrast [class*="gradient-overlay"] {
+  display: none !important;
+  background: none !important;
+}
+
+/* 5. Intelligent CSS Mask Icons & SVG Visibility (Hamburger, Search, Tools) */
+html.lucent-high-contrast [data-lucent-mask-icon="true"],
+html.lucent-high-contrast .vector-icon,
+html.lucent-high-contrast [class*="mw-ui-icon"],
+html.lucent-high-contrast [class*="vector-icon"],
+html.lucent-high-contrast [class*="octicon"] {
+  background-color: #ffff00 !important;
+}
+
+html.lucent-high-contrast a [data-lucent-mask-icon="true"],
+html.lucent-high-contrast a .vector-icon,
+html.lucent-high-contrast a [class*="mw-ui-icon"],
+html.lucent-high-contrast a [class*="vector-icon"] {
+  background-color: #38bdf8 !important;
+}
+
+html.lucent-high-contrast svg:not(#lucent-widget *):not([role="img"]) {
+  fill: currentColor !important;
+}
+
+html.lucent-high-contrast svg:not(#lucent-widget *):not([role="img"]) path,
+html.lucent-high-contrast svg:not(#lucent-widget *):not([role="img"]) circle,
+html.lucent-high-contrast svg:not(#lucent-widget *):not([role="img"]) rect,
+html.lucent-high-contrast svg:not(#lucent-widget *):not([role="img"]) polygon {
+  fill: currentColor !important;
+}
+
+/* 6. Dark Transparent Logo Inversion (Fixes blacked-out Wikipedia globe & brand logos) */
+html.lucent-high-contrast .mw-logo-icon,
+html.lucent-high-contrast .mw-logo-wordmark,
+html.lucent-high-contrast .mw-logo-tagline,
+html.lucent-high-contrast img[src*="wikipedia" i],
+html.lucent-high-contrast img[src*="wikimedia" i],
+html.lucent-high-contrast [data-lucent-inverted-logo="true"] {
+  filter: invert(1) hue-rotate(180deg) brightness(1.25) contrast(1.15) !important;
+}
+
+/* Keep standard photos natural */
+html.lucent-high-contrast img:not([data-lucent-inverted-logo="true"]):not(.mw-logo-icon):not([src*="wikipedia"]):not([src*="wikimedia"]),
+html.lucent-high-contrast video {
+  filter: brightness(0.95) contrast(1.1) !important;
+}
+
+/* 7. Structural Card & Surface Preservation (Infoboxes & Alert Banners) */
+html.lucent-high-contrast .infobox,
+html.lucent-high-contrast table.infobox,
+html.lucent-high-contrast .navbox,
+html.lucent-high-contrast [class*="infobox"] {
+  background-color: #0c0e12 !important;
+  border: 1px solid #555500 !important;
+}
+
+html.lucent-high-contrast .infobox th,
+html.lucent-high-contrast .infobox .infobox-above,
+html.lucent-high-contrast .infobox .infobox-header {
+  background-color: #171b22 !important;
+  color: #ffd700 !important;
+  border: 1px solid #444400 !important;
+}
+
+html.lucent-high-contrast .infobox td {
+  background-color: #0c0e12 !important;
+  border: 1px solid #282800 !important;
+}
+
+/* Warning & Citation Banners (e.g. Wikipedia .ambox) */
+html.lucent-high-contrast .ambox,
+html.lucent-high-contrast [role="alert"],
+html.lucent-high-contrast .notice,
+html.lucent-high-contrast .warning {
+  background-color: #141100 !important;
+  border-left: 6px solid #ffd700 !important;
+  border-top: 1px solid #332d00 !important;
+  border-right: 1px solid #332d00 !important;
+  border-bottom: 1px solid #332d00 !important;
+  border-radius: 4px !important;
+}
+
+/* 8. Interactive Form Controls, Buttons & Search Engine Optimizations */
+
+/* Text inputs, search inputs, textareas */
+html.lucent-high-contrast input[type="text"]:not(#lucent-widget *),
+html.lucent-high-contrast input[type="search"]:not(#lucent-widget *),
+html.lucent-high-contrast input[type="email"]:not(#lucent-widget *),
+html.lucent-high-contrast input[type="password"]:not(#lucent-widget *),
+html.lucent-high-contrast input[type="number"]:not(#lucent-widget *),
+html.lucent-high-contrast input[type="tel"]:not(#lucent-widget *),
+html.lucent-high-contrast input[type="url"]:not(#lucent-widget *),
+html.lucent-high-contrast select:not(#lucent-widget *),
+html.lucent-high-contrast textarea:not(#lucent-widget *) {
+  background-color: #121214 !important;
+  color: #ffff00 !important;
+  border: 1px solid #555500 !important;
+  border-radius: 6px !important;
+}
+
+/* Standard clickable action and submit buttons */
+html.lucent-high-contrast button:not(#lucent-widget *),
+html.lucent-high-contrast input[type="submit"]:not(#lucent-widget *),
+html.lucent-high-contrast input[type="button"]:not(#lucent-widget *) {
+  background-color: #1a1a1d !important;
+  color: #ffff00 !important;
+  border: 1px solid #555500 !important;
+  border-radius: 6px !important;
+}
+
+/* Icon-only and toolbar buttons: ELIMINATE WIREFRAME BOXES! (Google G logo, menu, edit, mic, lens, apps) */
+html.lucent-high-contrast button:not(#lucent-widget *):has(svg),
+html.lucent-high-contrast button:not(#lucent-widget *):has(img),
+html.lucent-high-contrast button:not(#lucent-widget *)[aria-label]:not(:has(span:not([class*="icon"]))),
+html.lucent-high-contrast [role="button"]:has(svg),
+html.lucent-high-contrast [role="button"]:has(img),
+html.lucent-high-contrast button[class*="icon" i],
+html.lucent-high-contrast [role="button"][class*="icon" i],
+html.lucent-high-contrast button.M6CB1c,
+html.lucent-high-contrast button.F1akfd,
+html.lucent-high-contrast .gb_d,
+html.lucent-high-contrast .gb_e,
+html.lucent-high-contrast .gb_f,
+html.lucent-high-contrast .iblpc:has(svg) {
+  border: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Button & control focus/hover accessibility feedback */
+html.lucent-high-contrast button:not(#lucent-widget *):hover,
+html.lucent-high-contrast input[type="submit"]:hover,
+html.lucent-high-contrast input[type="button"]:hover,
+html.lucent-high-contrast [role="button"]:not(#lucent-widget *):hover {
+  background-color: rgba(255, 255, 0, 0.15) !important;
+  color: #ffffff !important;
+  cursor: pointer !important;
+}
+
+html.lucent-high-contrast input:not(#lucent-widget *):focus,
+html.lucent-high-contrast select:not(#lucent-widget *):focus,
+html.lucent-high-contrast textarea:not(#lucent-widget *):focus,
+html.lucent-high-contrast button:not(#lucent-widget *):focus-visible,
+html.lucent-high-contrast [role="button"]:not(#lucent-widget *):focus-visible {
+  outline: 2px solid #38bdf8 !important;
+  outline-offset: 2px !important;
+}
+
+/* Interactive Chips, Suggestion Pills & Filter Buttons (e.g. AI Prompt pills, Overview) */
+html.lucent-high-contrast [role="button"][class*="chip" i],
+html.lucent-high-contrast [role="button"][class*="pill" i],
+html.lucent-high-contrast button[class*="chip" i],
+html.lucent-high-contrast button[class*="pill" i],
+html.lucent-high-contrast .iblpc {
+  background-color: #121417 !important;
+  color: #ffd700 !important;
+  border: 1px solid #555500 !important;
+  border-radius: 9999px !important;
+}
+
+/* Google Search Input Bar: Seamless high-contrast pill */
+html.lucent-high-contrast .RNNXgb,
+html.lucent-high-contrast [role="search"] form,
+html.lucent-high-contrast form[role="search"] {
+  background-color: #161618 !important;
+  border: 1.5px solid #ffd700 !important;
+  border-radius: 24px !important;
+  box-shadow: none !important;
+}
+
+html.lucent-high-contrast textarea[name="q"],
+html.lucent-high-contrast input[name="q"],
+html.lucent-high-contrast .gLFyf {
+  background-color: transparent !important;
+  color: #ffff00 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Google Search Navigation Bar (All, Images, Videos, Shopping, More) */
+html.lucent-high-contrast .hdtb-mitem a,
+html.lucent-high-contrast [role="navigation"] a:not([class*="btn"]):not([role="button"]),
+html.lucent-high-contrast [role="tab"] {
+  color: #ffff00 !important;
+  text-decoration: none !important;
+  border: none !important;
+}
+
+html.lucent-high-contrast .hdtb-mitem a:hover,
+html.lucent-high-contrast [role="tab"]:hover,
+html.lucent-high-contrast [role="tab"][aria-selected="true"] {
+  color: #38bdf8 !important;
+  border-bottom: 2px solid #ffd700 !important;
+}
+
+/* Google Search Cards, Knowledge Panels & AI Overview Containers */
+html.lucent-high-contrast .xpdopen,
+html.lucent-high-contrast .kp-blk,
+html.lucent-high-contrast g-inner-card,
+html.lucent-high-contrast .G920zb,
+html.lucent-high-contrast [data-attrid],
+html.lucent-high-contrast .MjjYud {
+  background-color: #0d0f12 !important;
+  border-color: #333300 !important;
+}
+
+/* Clean Sidebar Separation without Neon Yellow Borders */
+html.lucent-high-contrast aside,
+html.lucent-high-contrast [role="complementary"],
+html.lucent-high-contrast [class*="sidebar" i],
+html.lucent-high-contrast [class*="left-rail" i] {
+  background-color: #0c0c0e !important;
+  border-color: #2a2a00 !important;
+}
+
+/* Ensure Google and Card Thumbnails Stay Crisp */
+html.lucent-high-contrast g-img img,
+html.lucent-high-contrast .uhHOwf img,
+html.lucent-high-contrast .mJ3Ukc img,
+html.lucent-high-contrast .YQ4gaf {
+  filter: contrast(1.05) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Real-time Typography Scaling Controller */
+.widget-font-size-control {
+  background: #112217 !important;
+  border: 1px solid #20442c !important;
+  border-radius: 8px !important;
+  padding: 8px 10px !important;
+  margin-bottom: 8px !important;
+}
+
+/* Bold Typography & Minimum Size Floor */
+html.lucent-bold-text body,
+html.lucent-bold-text p,
+html.lucent-bold-text span,
+html.lucent-bold-text a,
+html.lucent-bold-text li,
+html.lucent-bold-text label,
+html.lucent-bold-text button,
+html.lucent-bold-text div {
+  font-weight: 600 !important;
+  font-size: max(1.05rem, 18px) !important;
+  line-height: 1.65 !important;
+  letter-spacing: 0.02em !important;
+}
+
+/* Cursor Crosshairs Guide */
+.lucent-crosshair-h {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 2px !important;
+  background: rgba(251, 191, 36, 0.75) !important;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.5) !important;
+  pointer-events: none !important;
+  z-index: 2147483644 !important;
+  top: 0 !important;
+  transform: translateY(-100px);
+  will-change: transform !important;
+}
+
+.lucent-crosshair-v {
+  position: fixed !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  width: 2px !important;
+  background: rgba(251, 191, 36, 0.75) !important;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.5) !important;
+  pointer-events: none !important;
+  z-index: 2147483644 !important;
+  left: 0 !important;
+  transform: translateX(-100px);
+  will-change: transform !important;
+}
+
+/* Hover Magnifier Loupe: Ergonomic Floating Rectangular Tooltip */
+.lucent-magnifier-loupe {
+  position: fixed !important;
+  max-width: 440px !important;
+  min-width: 140px !important;
+  width: max-content !important;
+  height: auto !important;
+  border-radius: 10px !important;
+  border: 2px solid #ffd700 !important;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.95), 0 16px 36px rgba(0, 0, 0, 0.75), 0 0 16px rgba(255, 215, 0, 0.25) !important;
+  pointer-events: none !important;
+  z-index: 2147483645 !important;
+  overflow: hidden !important;
+  left: 0 !important;
+  top: 0 !important;
+  transform: translate(-999px, -999px);
+  background: #090d16 !important;
+  display: block !important;
+  color: #fef08a !important;
+  font: 600 16px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  padding: 10px 16px !important;
+  text-align: left !important;
+  word-break: normal !important;
+  word-wrap: break-word !important;
+  letter-spacing: 0.02em !important;
+  transition: opacity 0.12s ease !important;
+  opacity: 0;
+}
+
+.lucent-magnifier-loupe .lucent-loupe-focused-word {
+  color: #ffffff !important;
+  background-color: rgba(234, 179, 8, 0.35) !important;
+  padding: 1px 5px !important;
+  border-radius: 4px !important;
+  font-weight: 800 !important;
+  text-decoration: underline !important;
+  text-decoration-color: #ffd700 !important;
+}
+
+/* Text-to-Speech Active Sentence Highlight */
+.lucent-speech-active {
+  background-color: rgba(250, 204, 21, 0.45) !important;
+  outline: 3px solid #eab308 !important;
+  outline-offset: 2px !important;
+  border-radius: 4px !important;
+}
+
+/* Gemini AI Auto-Remediation Hitbox & Feedback */
+.lucent-touch-remediated {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.lucent-ai-toast {
+  position: fixed !important;
+  bottom: 24px !important;
+  left: 50% !important;
+  transform: translateX(-50%) translateY(100px) !important;
+  background: #0f291e !important;
+  color: #ecfff3 !important;
+  border: 1px solid #22c55e !important;
+  border-radius: 999px !important;
+  padding: 10px 22px !important;
+  font: 600 13px system-ui, -apple-system, sans-serif !important;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.6) !important;
+  z-index: 2147483647 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.lucent-ai-toast.show {
+  transform: translateX(-50%) translateY(0) !important;
+  opacity: 1 !important;
+}
+.lucent-ai-toast-icon {
+  font-size: 16px !important;
+  color: #4ade80 !important;
+}
+
+/* Cognitive: AI Text Simplification & Summarization Cards */
+.lucent-simplified-card {
+  background: #0d1a13 !important;
+  border: 1.5px solid #2e6040 !important;
+  border-left: 5px solid #4ade80 !important;
+  border-radius: 10px !important;
+  padding: 12px 16px !important;
+  margin: 16px 0 !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  font-family: system-ui, -apple-system, sans-serif !important;
+  text-align: left !important;
+  box-sizing: border-box !important;
+}
+
+.lucent-simplified-card:hover {
+  background: #11241a !important;
+  border-color: #4ade80 !important;
+  box-shadow: 0 6px 24px rgba(74, 222, 128, 0.15) !important;
+}
+
+.lucent-simplified-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-bottom: 8px !important;
+  padding-bottom: 6px !important;
+  border-bottom: 1px solid rgba(74, 222, 128, 0.2) !important;
+}
+
+.lucent-simplified-tag {
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  color: #4ade80 !important;
+  background: rgba(74, 222, 128, 0.15) !important;
+  padding: 2px 8px !important;
+  border-radius: 999px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  letter-spacing: 0.03em !important;
+}
+
+.lucent-simplified-action {
+  font-size: 11px !important;
+  color: #8bb799 !important;
+  font-weight: 600 !important;
+}
+
+.lucent-simplified-bullets {
+  margin: 0 !important;
+  padding-left: 20px !important;
+  list-style-type: disc !important;
+  color: #eafbf0 !important;
+  font-size: 15px !important;
+  line-height: 1.6 !important;
+  letter-spacing: 0.015em !important;
+}
+
+.lucent-simplified-bullets li {
+  margin-bottom: 6px !important;
+  color: #eafbf0 !important;
+}
+
+.lucent-simplified-bullets li:last-child {
+  margin-bottom: 0 !important;
+}
+
+.lucent-original-drawer {
+  padding-top: 8px !important;
+  border-top: 1px dashed rgba(255, 255, 255, 0.15) !important;
+  margin-top: 8px !important;
+}
+
+.lucent-original-label {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  color: #8bb799 !important;
+  text-transform: uppercase !important;
+  margin-bottom: 4px !important;
+  letter-spacing: 0.05em !important;
+}
+
+.lucent-original-body {
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+  color: #cfe5d6 !important;
+  opacity: 0.9 !important;
+}
+
