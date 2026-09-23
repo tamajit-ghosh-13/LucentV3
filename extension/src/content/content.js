@@ -1829,6 +1829,7 @@ function rebuildWidgetOptions() {
     updateSimplifyButtonUI();
   }
 
+  if (restoreBtn) {
     restoreBtn.addEventListener('click', (event) => {
       event.stopPropagation();
       restoreActivePage();
