@@ -8,3 +8,12 @@ coverage/
 .env.*
 .env*
 !.env.example
+
+# Tooling & Agent Artifacts
+.agents/
+graphify-out/
+.env.example
+
+# Submission Archives & Video
+*Submission*.zip
+*.mp4
