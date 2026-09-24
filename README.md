@@ -24,7 +24,7 @@
 
 <br/>
 
-> **🏆 Global Innovation Hackathon 2030 · Warner & Spencer**
+> **🏆 Global Innovation Hackathon 2026**
 >
 > *Debadrita Bhattacharyya · Reetabrata Mandal · Prathama Biswas · Enaakshi Sen · Tamajit Ghosh · Shreyan Dasgupta*
 
