@@ -63,7 +63,7 @@
   - [⚡ Quick Start for Evaluators](#-quick-start-for-evaluators)
   - [📁 Repository Structure](#-repository-structure)
 - [👥 Team & Submission Credits](#-team--submission-credits)
-
+**The current Codebase is in Prototype phase, as we are yet to implement the RL loop due to Virtual Machines cost**
 ---
 
 ## 1. 🚨 Problem Statement
