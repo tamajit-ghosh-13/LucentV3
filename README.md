@@ -38,7 +38,7 @@
 
 > **Live Deployed App**: [https://lucent-v3.vercel.app](https://lucent-v3.vercel.app)  
 > **GitHub Repository**: [https://github.com/tamajit-ghosh-13/LucentV3](https://github.com/tamajit-ghosh-13/LucentV3)  
-> **Video Walkthrough**: `Explanation.mp4` (included in the root of this submission package)  
+> **Video Walkthrough**: [Watch on YouTube (https://youtu.be/DA1tLGGaov0)](https://youtu.be/DA1tLGGaov0) · `Explanation.mp4`  
 
 ---
 
@@ -70,7 +70,12 @@ Lucent operates directly inside the user's browser, modifying third-party websit
 ---
 
 ### 3. 🎥 Watch the Feature Walkthrough Video
-Open **`Explanation.mp4`** in any standard video player (VLC, QuickTime, Chrome) for a comprehensive guided tour of every feature and the design philosophy behind Lucent.
+Watch our complete feature walkthrough, live demonstrations, and architectural overview:
+
+[![Lucent Video Walkthrough](youtube_thumbnail.jpg)](https://youtu.be/DA1tLGGaov0)
+
+▶️ **[Click here to watch on YouTube (https://youtu.be/DA1tLGGaov0)](https://youtu.be/DA1tLGGaov0)**  
+*(Also available offline as `Explanation.mp4` in the root of the project package).*
 
 ---
 
@@ -94,7 +99,7 @@ npm run dev
 ## 🏗️ Submission Directory Structure
 
 ```text
-├── Explanation.mp4             # Complete video walkthrough of all features
+├── Explanation.mp4             # Video walkthrough (YouTube: https://youtu.be/DA1tLGGaov0)
 ├── README.md                   # Evaluator guide, architecture & submission docs
 ├── extension/                  # Chrome Extension source (Manifest V3)
 │   ├── manifest.json

@@ -6,6 +6,7 @@ import {
   Sparkles,
   Accessibility,
   BarChart3,
+  Youtube,
 } from "lucide-react";
 
 import { NavLink, useNavigate } from "react-router-dom";
@@ -87,6 +88,18 @@ export default function Sidebar() {
 
       {/* BOTTOM */}
       <div className="dashboard-sidebar-bottom">
+
+        <a
+          href="https://youtu.be/DA1tLGGaov0"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="dashboard-nav-item"
+          style={{ color: '#ef4444' }}
+          title="Watch Feature Walkthrough Video on YouTube"
+        >
+          <Youtube size={18} />
+          <span>Video Demo ↗</span>
+        </a>
 
         <NavLink
           to="/dashboard/settings"
