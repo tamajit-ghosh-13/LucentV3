@@ -1,3 +1,39 @@
+<div align="center">
+
+```
+██╗     ██╗   ██╗ ██████╗███████╗███╗   ██╗████████╗
+██║     ██║   ██║██╔════╝██╔════╝████╗  ██║╚══██╔══╝
+██║     ██║   ██║██║     █████╗  ██╔██╗ ██║   ██║   
+██║     ██║   ██║██║     ██╔══╝  ██║╚██╗██║   ██║   
+███████╗╚██████╔╝╚██████╗███████╗██║ ╚████║   ██║   
+╚══════╝ ╚═════╝  ╚═════╝╚══════╝╚═╝  ╚═══╝   ╚═╝   
+```
+
+### **The Autonomous, Client-Side Web Accessibility Engine**
+#### *Adapts any website, in real-time, for any user — without touching a single line of the site's code.*
+
+<br/>
+
+[![Made with React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Gemini](https://img.shields.io/badge/Gemini_2.0-AI_Powered-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/technologies/gemini/)
+[![Manifest V3](https://img.shields.io/badge/Chrome_Extension-Manifest_V3-FBBC05?style=for-the-badge&logo=googlechrome&logoColor=black)](https://developer.chrome.com/docs/extensions/mv3/)
+[![WCAG](https://img.shields.io/badge/WCAG-2.2_AAA-005A9C?style=for-the-badge&logo=w3c&logoColor=white)](https://www.w3.org/WAI/WCAG22/)
+
+<br/>
+
+> **🏆 Global Innovation Hackathon 2030 · Warner & Spencer**
+>
+> *Debadrita Bhattacharyya · Reetabrata Mandal · Prathama Biswas · Enaakshi Sen · Tamajit Ghosh · Shreyan Dasgupta*
+
+<br/>
+
+</div>
+
+---
+
 # 🌟 Lucent — Submission & Evaluator Guide
 
 > **Live Deployed App**: [https://lucent-v3.vercel.app](https://lucent-v3.vercel.app)  
@@ -59,8 +95,7 @@ npm run dev
 
 ```text
 ├── Explanation.mp4             # Complete video walkthrough of all features
-├── SUBMISSION_README.md        # This guide with live links and instructions
-├── README.md                   # Full comprehensive architecture & WCAG documentation
+├── README.md                   # Evaluator guide, architecture & submission docs
 ├── extension/                  # Chrome Extension source (Manifest V3)
 │   ├── manifest.json
 │   ├── src/
