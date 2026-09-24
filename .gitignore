@@ -13,3 +13,7 @@ coverage/
 .agents/
 graphify-out/
 .env.example
+
+# Submission Archives & Video
+*Submission*.zip
+*.mp4
