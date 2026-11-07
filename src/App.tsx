@@ -1,7 +1,7 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import DashboardLayout from './dashboard/layouts/DashboardLayout'; import Dashboard from './dashboard/pages/Dashboard'; import Features from './dashboard/pages/Features'; import Activity from './dashboard/pages/Activity'; import Analytics from './dashboard/pages/Analytics'; import Settings from './dashboard/pages/Settings';
+import { AuthPage } from './signuppage/AuthPage'; import type { AccessibilityProfile } from './types'; import { useLucent } from './lib/lucent-state';
+function AuthGate(){const navigate=useNavigate();const {update,signIn,user}=useLucent();if(user)return <Navigate to="/dashboard" replace/>;const launch=(profile:AccessibilityProfile,email='guest@lucent.local',name='Guest explorer')=>{update({profile,enabled:profile!=='raw',cognitive:profile==='cognitive'?{declutter:true,dyslexia:true,readingGuide:false,calmMode:true,readingWidth:true}:{declutter:false,dyslexia:false,readingGuide:false,calmMode:false,readingWidth:false},motor:profile==='motor'?{targets:true,focus:true,shortcuts:true,steadyClick:true,largeCursor:true}:{targets:false,focus:false,shortcuts:false,steadyClick:true,largeCursor:false},visual:profile==='visual'?{fontSize:18,daltonize:true,highContrast:true,boldText:true,magnifier:false,crosshairs:false,textToSpeech:false}:{fontSize:16,daltonize:false,highContrast:false,boldText:false,magnifier:false,crosshairs:false,textToSpeech:false}});signIn({name,email,guest:email==='guest@lucent.local'});navigate('/dashboard');};return <AuthPage onContinueAsGuest={profile=>launch(profile)} onAuthSuccess={(profile,email,name)=>launch(profile,email,name)}/>}
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { 

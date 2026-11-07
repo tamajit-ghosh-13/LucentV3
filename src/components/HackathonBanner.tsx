@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { Sparkles, ChevronDown, ChevronUp, Users, Award, ShieldCheck } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronUp, Users, Award, ShieldCheck, Play } from 'lucide-react';
 
 export const HackathonBanner: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -20,14 +19,24 @@ export const HackathonBanner: React.FC = () => {
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          <a
+            href="https://youtu.be/DA1tLGGaov0"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-[11px] bg-red-600 hover:bg-red-500 text-white font-semibold px-2 py-0.5 rounded transition-colors shadow-sm"
+            title="Watch full walkthrough video on YouTube"
+          >
+            <Play size={10} className="fill-current" />
+            <span>Watch Demo Video</span>
+          </a>
           <button
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
             className="flex items-center gap-1 text-[11px] text-indigo-300 hover:text-indigo-100 font-medium transition-colors"
           >
             <Users size={13} />
-            <span>Team & Problem Statement</span>
+            <span>Team & Problem</span>
             {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
           </button>
         </div>
@@ -54,6 +63,17 @@ export const HackathonBanner: React.FC = () => {
           </p>
           <p className="text-indigo-300">
             <strong>Solution:</strong> Manifest V3 Chrome Extension combining real-time DOM mutation, Multimodal Gemini AI vision understanding, and an online Reinforcement Learning loop that optimizes UI constraints to individual user abilities.
+          </p>
+          <p className="text-slate-300 pt-1">
+            <strong>Video Walkthrough:</strong>{' '}
+            <a
+              href="https://youtu.be/DA1tLGGaov0"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-red-400 hover:text-red-300 underline font-medium"
+            >
+              Watch the full feature walkthrough on YouTube (https://youtu.be/DA1tLGGaov0) ↗
+            </a>
           </p>
         </div>
       )}

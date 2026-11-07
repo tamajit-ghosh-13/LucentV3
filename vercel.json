@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/ai-scan",
+      "destination": "/api/ai-scan"
+    },
+    {
+      "source": "/api/ai-simplify",
+      "destination": "/api/ai-simplify"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
